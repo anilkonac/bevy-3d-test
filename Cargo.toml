@@ -14,6 +14,5 @@ opt-level = 1
 opt-level = 3
 
 [dependencies]
-bevy = "0.8.1"
-# cpal = "0.13.4"
-alsa = "=0.6.0"
+bevy = {version = "0.8.1", features = ["dynamic"] } # https://bevyengine.org/learn/book/getting-started/setup/#enable-fast-compiles-optional
+alsa = "=0.6.0"                                     # https://github.com/diwic/alsa-rs/issues/90
