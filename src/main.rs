@@ -1,7 +1,7 @@
 use bevy::{prelude::*, time::FixedTimestep};
 
 const TIME_STEP: f32 = 1.0 / 60.0;
-const PLAYER_SPEED: f32 = 1.0;
+const PLAYER_SPEED: f32 = 3.0;
 
 fn main() {
     App::new()
@@ -12,7 +12,6 @@ fn main() {
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                 .with_system(player_movement_system),
         )
-        .add_system(player_movement_system)
         .run();
 }
 
