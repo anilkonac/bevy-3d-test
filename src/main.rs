@@ -2,6 +2,10 @@ use bevy::{prelude::*, time::FixedTimestep};
 
 const TIME_STEP: f32 = 1.0 / 60.0;
 const PLAYER_SPEED: f32 = 3.0;
+const KEYS_FORWARD: [KeyCode; 2] = [KeyCode::W, KeyCode::Up];
+const KEYS_BACKWARD: [KeyCode; 2] = [KeyCode::S, KeyCode::Down];
+const KEYS_RIGHT: [KeyCode; 2] = [KeyCode::D, KeyCode::Right];
+const KEYS_LEFT: [KeyCode; 2] = [KeyCode::A, KeyCode::Left];
 
 fn main() {
     App::new()
@@ -41,7 +45,6 @@ fn setup(
     // light
     commands.spawn_bundle(DirectionalLightBundle {
         directional_light: DirectionalLight {
-            illuminance: 80000.0,
             shadows_enabled: true,
             ..default()
         },
@@ -70,26 +73,36 @@ fn player_movement_system(
     keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<&mut Transform, With<Player>>,
 ) {
+    let mut movement_factor_forward = 0.0;
+    let mut movement_factor_side = 0.0;
+    if keyboard_input.any_pressed(KEYS_FORWARD) {
+        movement_factor_forward -= 1.0
+    }
+    if keyboard_input.any_pressed(KEYS_BACKWARD) {
+        movement_factor_forward += 1.0;
+    }
+    if keyboard_input.any_pressed(KEYS_RIGHT) {
+        movement_factor_side += 1.0;
+    }
+    if keyboard_input.any_pressed(KEYS_LEFT) {
+        movement_factor_side += -1.0;
+    }
+
+    if (movement_factor_forward == 0.0) && (movement_factor_side == 0.0) {
+        return;
+    }
+
     let mut transform = query.single_mut();
-    let mut movement_factor = 0.0;
-    if keyboard_input.pressed(KeyCode::W) {
-        movement_factor = -1.0;
-    }
-    if keyboard_input.pressed(KeyCode::A) {
-        info!("A is pressed");
-    }
-    if keyboard_input.pressed(KeyCode::S) {
-        movement_factor = 1.0;
-    }
-    if keyboard_input.pressed(KeyCode::D) {
-        info!("D is pressed");
-    }
 
-    // get player's forward vector
-    let movement_direction = transform.rotation * Vec3::Z;
+    // get player's forward vector and side vectors
+    let movement_direction_forward = transform.rotation * Vec3::Z;
+    let movement_direction_side = transform.rotation * Vec3::X;
 
-    let movement_distance = movement_factor * PLAYER_SPEED * TIME_STEP;
-    let translation_delta = movement_direction * movement_distance;
+    //  Calculate movement direction
+    let movement_direction = movement_factor_forward * movement_direction_forward
+        + movement_factor_side * movement_direction_side;
+    let movement_direction = movement_direction.normalize();
 
-    transform.translation += translation_delta;
+    // Apply translation
+    transform.translation += movement_direction * PLAYER_SPEED * TIME_STEP;
 }
