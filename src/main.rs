@@ -1,8 +1,10 @@
 use bevy::{
     // diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    // ecs::schedule::ReportExecutionOrderAmbiguities,
     input::mouse::MouseMotion,
     prelude::*,
     time::FixedTimestep,
+    window::close_when_requested,
 };
 
 const TIME_STEP: f32 = 1.0 / 60.0;
@@ -22,13 +24,14 @@ fn main() {
         // .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .insert_resource(MouseGrabbed(false))
         .add_startup_system(setup)
-        .add_system(grab_mouse)
+        .add_system(grab_mouse.before(close_when_requested))
         .add_system_set(
             SystemSet::new()
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                .with_system(player_look_system)
+                .with_system(player_look_system.before(player_movement_system))
                 .with_system(player_movement_system),
         )
+        // .init_resource::<ReportExecutionOrderAmbiguities>()
         .run();
 }
 
@@ -136,8 +139,8 @@ fn player_look_system(
     // println!("{:?}", delta);
 
     let mut transform = query.single_mut();
-    transform.rotate_y(-delta.x.to_radians());
-    transform.rotate_local_x(-delta.y.to_radians());
+    transform.rotate_y(-delta.x * TIME_STEP);
+    transform.rotate_local_x(-delta.y * TIME_STEP);
     // transform.rotate_local(Quat::from_euler(
     //     EulerRot::YXZ,
     //     -delta.x.to_radians(),
