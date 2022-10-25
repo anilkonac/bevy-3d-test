@@ -74,33 +74,30 @@ fn player_movement_system(
     mut query: Query<&mut Transform, With<Player>>,
 ) {
     let mut movement_factor_forward = 0.0;
-    let mut movement_factor_side = 0.0;
+    let mut movement_factor_right = 0.0;
     if keyboard_input.any_pressed(KEYS_FORWARD) {
-        movement_factor_forward -= 1.0
+        movement_factor_forward += 1.0
     }
     if keyboard_input.any_pressed(KEYS_BACKWARD) {
-        movement_factor_forward += 1.0;
+        movement_factor_forward -= 1.0;
     }
     if keyboard_input.any_pressed(KEYS_RIGHT) {
-        movement_factor_side += 1.0;
+        movement_factor_right += 1.0;
     }
     if keyboard_input.any_pressed(KEYS_LEFT) {
-        movement_factor_side += -1.0;
+        movement_factor_right += -1.0;
     }
 
-    if (movement_factor_forward == 0.0) && (movement_factor_side == 0.0) {
+    if (movement_factor_forward == 0.0) && (movement_factor_right == 0.0) {
         return;
     }
 
     let mut transform = query.single_mut();
 
-    // get player's forward vector and side vectors
-    let movement_direction_forward = transform.rotation * Vec3::Z;
-    let movement_direction_side = transform.rotation * Vec3::X;
-
     //  Calculate movement direction
-    let movement_direction = movement_factor_forward * movement_direction_forward
-        + movement_factor_side * movement_direction_side;
+    let movement_direction =
+        movement_factor_forward * transform.forward() + movement_factor_right * transform.right();
+
     let movement_direction = movement_direction.normalize();
 
     // Apply translation
