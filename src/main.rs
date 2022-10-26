@@ -1,18 +1,20 @@
+use std::f32::consts::FRAC_PI_2;
+
 use bevy::{
     // diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     // ecs::schedule::ReportExecutionOrderAmbiguities,
     input::mouse::MouseMotion,
     prelude::*,
-    time::FixedTimestep,
     window::close_when_requested,
 };
 
-const TIME_STEP: f32 = 1.0 / 60.0;
 const PLAYER_SPEED: f32 = 3.0;
+const PLAYER_HEIGHT: f32 = 1.8;
 const KEYS_FORWARD: [KeyCode; 2] = [KeyCode::W, KeyCode::Up];
 const KEYS_BACKWARD: [KeyCode; 2] = [KeyCode::S, KeyCode::Down];
 const KEYS_RIGHT: [KeyCode; 2] = [KeyCode::D, KeyCode::Right];
 const KEYS_LEFT: [KeyCode; 2] = [KeyCode::A, KeyCode::Left];
+const MOUSE_SENSITIVITY: f32 = 0.15;
 
 // Resource
 struct MouseGrabbed(bool);
@@ -27,7 +29,6 @@ fn main() {
         .add_system(grab_mouse.before(close_when_requested))
         .add_system_set(
             SystemSet::new()
-                .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                 .with_system(player_look_system.before(player_movement_system))
                 .with_system(player_movement_system),
         )
@@ -37,6 +38,12 @@ fn main() {
 
 #[derive(Component)]
 struct Player;
+
+#[derive(Component)]
+struct CameraState {
+    pitch: f32,
+    yaw: f32,
+}
 
 fn setup(
     mut commands: Commands,
@@ -77,23 +84,28 @@ fn setup(
     });
 
     // Camera
-    let camera_height = 1.5;
+    let cam_transform = Transform::from_xyz(-5.0, PLAYER_HEIGHT, -4.0).looking_at(
+        Vec3 {
+            x: 0.0,
+            y: PLAYER_HEIGHT,
+            z: 0.0,
+        },
+        Vec3::Y,
+    );
     commands
         .spawn_bundle(Camera3dBundle {
-            transform: Transform::from_xyz(-5.0, camera_height, -4.0).looking_at(
-                Vec3 {
-                    x: 0.0,
-                    y: camera_height,
-                    z: 0.0,
-                },
-                Vec3::Y,
-            ),
+            transform: cam_transform,
             ..default()
         })
-        .insert(Player);
+        .insert(Player)
+        .insert(CameraState {
+            pitch: 0.0,
+            yaw: cam_transform.rotation.to_euler(EulerRot::YXZ).0,
+        });
 }
 
 fn player_movement_system(
+    time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<&mut Transform, With<Player>>,
 ) {
@@ -125,28 +137,33 @@ fn player_movement_system(
     let movement_direction = movement_direction.normalize();
 
     // Apply translation
-    transform.translation += movement_direction * PLAYER_SPEED * TIME_STEP;
+    transform.translation += movement_direction * PLAYER_SPEED * time.delta_seconds();
 }
 
 fn player_look_system(
     mut mouse_motion_events: EventReader<MouseMotion>,
-    mut query: Query<&mut Transform, With<Player>>,
+    mut query: Query<(&mut Transform, &mut CameraState), With<Player>>,
 ) {
     let mut delta = Vec2::ZERO;
     for event in mouse_motion_events.iter() {
         delta += event.delta;
     }
-    // println!("{:?}", delta);
 
-    let mut transform = query.single_mut();
-    transform.rotate_y(-delta.x * TIME_STEP);
-    transform.rotate_local_x(-delta.y * TIME_STEP);
-    // transform.rotate_local(Quat::from_euler(
-    //     EulerRot::YXZ,
-    //     -delta.x.to_radians(),
-    //     -delta.y.to_radians(),
-    //     0.0,
-    // ));
+    if delta == Vec2::ZERO {
+        return;
+    }
+
+    let (mut transform, mut cam_state) = query.single_mut();
+
+    let mut yaw = cam_state.yaw;
+    let mut pitch = cam_state.pitch;
+    yaw -= (delta.x * MOUSE_SENSITIVITY).to_radians();
+    pitch -= (delta.y * MOUSE_SENSITIVITY).to_radians();
+    pitch = pitch.clamp(0.9 * -FRAC_PI_2, 0.9 * FRAC_PI_2);
+
+    transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
+    cam_state.yaw = yaw;
+    cam_state.pitch = pitch;
 }
 
 fn grab_mouse(
