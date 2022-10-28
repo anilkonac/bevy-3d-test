@@ -8,11 +8,16 @@ use player::PlayerPlugin;
 
 mod player;
 
+const COLOR_BACKGROUND: &str = "87CEEB"; // Sky Blue
+const COLOR_CUBE: &str = "FE4A49"; // Tart Orange
+const COLOR_GROUND: &str = "586A6A"; // Deep Space Sparkle
+
 // Resource
 struct MouseGrabbed(bool);
 
 fn main() {
     App::new()
+        .insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap())) // Sky Blue
         .add_plugins(DefaultPlugins)
         .add_plugin(PlayerPlugin)
         // .add_plugin(LogDiagnosticsPlugin::default())
@@ -40,14 +45,14 @@ fn setup(
     // ground plane
     commands.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Plane { size: 10.0 })),
-        material: materials.add(Color::GRAY.into()),
+        material: materials.add(Color::hex(COLOR_GROUND).unwrap().into()),
         ..default()
     });
 
     // cube
     commands.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-        material: materials.add(Color::TEAL.into()),
+        material: materials.add(Color::hex(COLOR_CUBE).unwrap().into()),
         transform: Transform::from_xyz(0.0, 0.5, 0.0),
         ..default()
     });

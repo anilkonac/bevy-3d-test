@@ -34,8 +34,6 @@ fn player_move_system(
     keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<&mut Transform, With<Player>>,
 ) {
-    // let mut movement_factor_forward = 0.0;
-    // let mut movement_factor_right = 0.0;
     let mut movement_axes = Vec3::ZERO;
     if keyboard_input.any_pressed(KEYS_FORWARD) {
         movement_axes.z += 1.0
