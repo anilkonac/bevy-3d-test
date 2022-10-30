@@ -7,16 +7,19 @@ const COLOR_BACKGROUND: &str = "87CEEB"; // Sky Blue
 const COLOR_CUBE: &str = "FE4A49"; // Tart Orange
 const COLOR_GROUND: &str = "586A6A"; // Deep Space Sparkle
 
-// Resource
-struct MouseGrabbed(bool);
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+enum AppState {
+    InGame,
+    Menu,
+}
 
 pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap())) // Sky Blue
+        app.insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap()))
             .add_plugin(PlayerPlugin)
-            .insert_resource(MouseGrabbed(false))
+            .add_state(AppState::InGame)
             .add_startup_system(setup)
             .add_system(grab_mouse.before(close_when_requested));
     }
@@ -27,13 +30,11 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut windows: ResMut<Windows>,
-    mut mouse_grabbed: ResMut<MouseGrabbed>,
 ) {
     // Grab mouse
     let window = windows.get_primary_mut().unwrap();
     window.set_cursor_visibility(false);
     window.set_cursor_lock_mode(true);
-    mouse_grabbed.0 = true;
 
     // ground plane
     commands.spawn_bundle(PbrBundle {
@@ -63,18 +64,22 @@ fn setup(
 
 fn grab_mouse(
     mut windows: ResMut<Windows>,
-    mouse: Res<Input<MouseButton>>,
     key: Res<Input<KeyCode>>,
-    mut mouse_grabbed: ResMut<MouseGrabbed>,
+    mut app_state: ResMut<State<AppState>>,
 ) {
-    let window = windows.get_primary_mut().unwrap();
-    if !mouse_grabbed.0 && mouse.just_pressed(MouseButton::Left) {
-        window.set_cursor_visibility(false);
-        window.set_cursor_lock_mode(true);
-        mouse_grabbed.0 = true;
-    } else if mouse_grabbed.0 && key.just_pressed(KeyCode::Escape) {
-        window.set_cursor_visibility(true);
-        window.set_cursor_lock_mode(false);
-        mouse_grabbed.0 = false;
+    if key.just_pressed(KeyCode::Escape) {
+        let window = windows.get_primary_mut().unwrap();
+        match app_state.current() {
+            AppState::InGame => {
+                window.set_cursor_visibility(true);
+                window.set_cursor_lock_mode(false);
+                app_state.set(AppState::Menu).unwrap();
+            }
+            AppState::Menu => {
+                window.set_cursor_visibility(false);
+                window.set_cursor_lock_mode(true);
+                app_state.set(AppState::InGame).unwrap();
+            }
+        }
     }
 }
