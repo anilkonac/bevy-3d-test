@@ -4,16 +4,18 @@ use std::f32::consts::FRAC_PI_2;
 use crate::AppState;
 
 const PLAYER_SPEED: f32 = 3.0;
-pub const PLAYER_HEIGHT: f32 = 1.8;
+const PLAYER_HEIGHT: f32 = 1.8;
+const PLAYER_HEIGHT_HEAD: f32 = 1.6;
+const PLAYER_INITIAL_POS: Vec3 = Vec3::new(-5.0, PLAYER_HEIGHT / 2.0, -4.0);
 const MOUSE_SENSITIVITY: f32 = 0.15;
 
 #[derive(Component)]
-pub struct Player;
+struct Player;
 
 #[derive(Component)]
-pub struct CameraState {
-    pub pitch: f32,
-    pub yaw: f32,
+struct HeadState {
+    pitch: f32,
+    yaw: f32,
 }
 
 pub struct PlayerPlugin;
@@ -30,24 +32,33 @@ impl Plugin for PlayerPlugin {
 }
 
 fn setup_player(mut commands: Commands) {
-    // Camera
-    let cam_transform = Transform::from_xyz(-5.0, PLAYER_HEIGHT, -4.0).looking_at(
-        Vec3 {
-            x: 0.0,
-            y: PLAYER_HEIGHT,
-            z: 0.0,
-        },
-        Vec3::Y,
-    );
+    let transform_player = Transform::from_translation(PLAYER_INITIAL_POS)
+        .looking_at(Vec3::new(0.0, PLAYER_HEIGHT / 2.0, 0.0), Vec3::Y);
+
+    let translation_head = Transform::from_translation(Vec3::new(
+        0.0,
+        PLAYER_HEIGHT / 4.0 + PLAYER_HEIGHT_HEAD / 2.0,
+        0.0,
+    ));
+
     commands
-        .spawn_bundle(Camera3dBundle {
-            transform: cam_transform,
+        .spawn()
+        // .insert(transform_player)
+        .insert_bundle(TransformBundle {
+            local: transform_player,
             ..default()
         })
         .insert(Player)
-        .insert(CameraState {
-            pitch: 0.0,
-            yaw: cam_transform.rotation.to_euler(EulerRot::YXZ).0,
+        .with_children(|parent| {
+            parent
+                .spawn_bundle(Camera3dBundle {
+                    transform: translation_head,
+                    ..default()
+                })
+                .insert(HeadState {
+                    pitch: 0.0,
+                    yaw: 0.0,
+                });
         });
 }
 
@@ -95,7 +106,7 @@ fn player_move_system(
 
 fn player_look_system(
     mut mouse_motion_events: EventReader<MouseMotion>,
-    mut query: Query<(&mut Transform, &mut CameraState), With<Player>>,
+    mut query: Query<(&mut Transform, &mut HeadState), With<HeadState>>,
 ) {
     let mut delta = Vec2::ZERO;
     for event in mouse_motion_events.iter() {
