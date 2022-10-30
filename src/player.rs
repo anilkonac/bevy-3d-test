@@ -4,28 +4,27 @@ use std::f32::consts::FRAC_PI_2;
 use crate::AppState;
 
 const PLAYER_SPEED: f32 = 3.0;
-pub const PLAYER_HEIGHT: f32 = 1.8;
+const PLAYER_HEIGHT: f32 = 1.8;
 const MOUSE_SENSITIVITY: f32 = 0.15;
 
 #[derive(Component)]
-pub struct Player;
+struct Player;
 
 #[derive(Component)]
-pub struct CameraState {
-    pub pitch: f32,
-    pub yaw: f32,
+struct CameraState {
+    pitch: f32,
+    yaw: f32,
 }
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup_player)
-            .add_system_set(
-                SystemSet::on_update(AppState::InGame)
-                    .with_system(player_look_system.before(player_move_system)),
-            )
-            .add_system_set(SystemSet::on_update(AppState::InGame).with_system(player_move_system));
+        app.add_startup_system(setup_player).add_system_set(
+            SystemSet::on_update(AppState::InGame)
+                .with_system(player_look_system.before(player_move_system))
+                .with_system(player_move_system),
+        );
     }
 }
 

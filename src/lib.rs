@@ -69,6 +69,7 @@ fn grab_mouse(
 ) {
     if key.just_pressed(KeyCode::Escape) {
         let window = windows.get_primary_mut().unwrap();
+
         match app_state.current() {
             AppState::InGame => {
                 window.set_cursor_visibility(true);
