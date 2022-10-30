@@ -3,22 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 
 const PLAYER_SPEED: f32 = 3.0;
 pub const PLAYER_HEIGHT: f32 = 1.8;
-const KEYS_FORWARD: [KeyCode; 2] = [KeyCode::W, KeyCode::Up];
-const KEYS_BACKWARD: [KeyCode; 2] = [KeyCode::S, KeyCode::Down];
-const KEYS_RIGHT: [KeyCode; 2] = [KeyCode::D, KeyCode::Right];
-const KEYS_LEFT: [KeyCode; 2] = [KeyCode::A, KeyCode::Left];
-const KEY_UP: KeyCode = KeyCode::E;
-const KEY_DOWN: KeyCode = KeyCode::Q;
 const MOUSE_SENSITIVITY: f32 = 0.15;
-
-pub struct PlayerPlugin;
-
-impl Plugin for PlayerPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_system(player_look_system.before(player_move_system))
-            .add_system(player_move_system);
-    }
-}
 
 #[derive(Component)]
 pub struct Player;
@@ -29,28 +14,60 @@ pub struct CameraState {
     pub yaw: f32,
 }
 
+pub struct PlayerPlugin;
+
+impl Plugin for PlayerPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_startup_system(setup_player)
+            .add_system(player_look_system.before(player_move_system))
+            .add_system(player_move_system);
+    }
+}
+
+fn setup_player(mut commands: Commands) {
+    // Camera
+    let cam_transform = Transform::from_xyz(-5.0, PLAYER_HEIGHT, -4.0).looking_at(
+        Vec3 {
+            x: 0.0,
+            y: PLAYER_HEIGHT,
+            z: 0.0,
+        },
+        Vec3::Y,
+    );
+    commands
+        .spawn_bundle(Camera3dBundle {
+            transform: cam_transform,
+            ..default()
+        })
+        .insert(Player)
+        .insert(CameraState {
+            pitch: 0.0,
+            yaw: cam_transform.rotation.to_euler(EulerRot::YXZ).0,
+        });
+}
+
 fn player_move_system(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<&mut Transform, With<Player>>,
 ) {
     let mut movement_axes = Vec3::ZERO;
-    if keyboard_input.any_pressed(KEYS_FORWARD) {
+    if keyboard_input.any_pressed([KeyCode::W, KeyCode::Up]) {
         movement_axes.z += 1.0
     }
-    if keyboard_input.any_pressed(KEYS_BACKWARD) {
+    if keyboard_input.any_pressed([KeyCode::S, KeyCode::Down]) {
         movement_axes.z -= 1.0;
     }
-    if keyboard_input.any_pressed(KEYS_RIGHT) {
+    if keyboard_input.any_pressed([KeyCode::D, KeyCode::Right]) {
         movement_axes.x += 1.0;
     }
-    if keyboard_input.any_pressed(KEYS_LEFT) {
+    if keyboard_input.any_pressed([KeyCode::A, KeyCode::Left]) {
         movement_axes.x += -1.0;
     }
-    if keyboard_input.pressed(KEY_UP) {
+    if keyboard_input.any_pressed([KeyCode::E, KeyCode::RShift]) {
         movement_axes.y += 1.0;
     }
-    if keyboard_input.pressed(KEY_DOWN) {
+    if keyboard_input.any_pressed([KeyCode::Q, KeyCode::RControl]) {
         movement_axes.y += -1.0;
     }
 
