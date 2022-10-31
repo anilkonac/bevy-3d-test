@@ -22,12 +22,11 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup_player)
-            .add_system_set(
-                SystemSet::on_update(AppState::InGame)
-                    .with_system(player_look_system.before(player_move_system)),
-            )
-            .add_system_set(SystemSet::on_update(AppState::InGame).with_system(player_move_system));
+        app.add_startup_system(setup_player).add_system_set(
+            SystemSet::on_update(AppState::InGame)
+                .with_system(player_look_system.before(player_move_system))
+                .with_system(player_move_system),
+        );
     }
 }
 
