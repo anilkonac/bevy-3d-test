@@ -34,37 +34,44 @@ fn setup_player(mut commands: Commands) {
     let transform_player = Transform::from_translation(PLAYER_INITIAL_POS)
         .looking_at(Vec3::new(0.0, PLAYER_HEIGHT / 2.0, 0.0), Vec3::Y);
 
-    let translation_head = Transform::from_translation(Vec3::new(
+    let transform_head = Transform::from_translation(Vec3::new(
         0.0,
         PLAYER_HEIGHT / 4.0 + PLAYER_HEIGHT_HEAD / 2.0,
         0.0,
     ));
 
-    commands
+    let player = commands
         .spawn()
-        // .insert(transform_player)
         .insert_bundle(TransformBundle {
             local: transform_player,
             ..default()
         })
         .insert(Player)
-        .with_children(|parent| {
-            parent
-                .spawn_bundle(Camera3dBundle {
-                    transform: translation_head,
-                    ..default()
-                })
-                .insert(HeadState {
-                    pitch: 0.0,
-                    yaw: 0.0,
-                });
-        });
+        .id();
+    // println!("Player entity spawned with id: {}", player.id());
+
+    let head = commands
+        .spawn_bundle(Camera3dBundle {
+            transform: transform_head,
+            ..default()
+        })
+        .insert(HeadState {
+            pitch: 0.0,
+            yaw: 0.0,
+        })
+        .id();
+    // println!("Head entity spawned with id: {}", head.id());
+
+    commands.entity(player).push_children(&[head]);
 }
 
 fn player_move_system(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
-    mut query: Query<&mut Transform, With<Player>>,
+    query_player: Query<Entity, With<Player>>,
+    query_head: Query<Entity, With<HeadState>>,
+    mut query_transforms: Query<&mut Transform, With<Transform>>,
+    mut query_head_state: Query<&mut HeadState, With<HeadState>>,
 ) {
     let mut movement_axes = Vec3::ZERO;
     if keyboard_input.any_pressed([KeyCode::W, KeyCode::Up]) {
@@ -90,17 +97,35 @@ fn player_move_system(
         return;
     }
 
-    let mut transform = query.single_mut();
+    let entity_player = query_player.single();
+    let mut head_state = query_head_state.single_mut();
+
+    /* Rotate player to the head direction (only yaw) */
+    if head_state.yaw != 0.0 {
+        // Rotate player body
+        let mut transform_player = query_transforms.get_mut(entity_player).unwrap();
+        transform_player.rotate_y(head_state.yaw);
+
+        // Reset head yaw
+        let entity_head = query_head.single();
+        let mut transform_head = query_transforms.get_mut(entity_head).unwrap();
+        transform_head.rotation = Quat::from_euler(EulerRot::YXZ, 0.0, head_state.pitch, 0.0);
+
+        head_state.yaw = 0.0;
+    }
+
+    /* Translate Player */
+    let mut transform_player = query_transforms.get_mut(entity_player).unwrap();
 
     //  Calculate movement direction
-    let movement_direction = movement_axes.z * transform.forward()
-        + movement_axes.x * transform.right()
-        + movement_axes.y * transform.up();
+    let movement_direction = movement_axes.z * transform_player.forward()
+        + movement_axes.x * transform_player.right()
+        + movement_axes.y * transform_player.up();
 
     let movement_direction = movement_direction.normalize();
 
     // Apply translation
-    transform.translation += movement_direction * PLAYER_SPEED * time.delta_seconds();
+    transform_player.translation += movement_direction * PLAYER_SPEED * time.delta_seconds();
 }
 
 fn player_look_system(
@@ -116,15 +141,15 @@ fn player_look_system(
         return;
     }
 
-    let (mut transform, mut cam_state) = query.single_mut();
+    let (mut transform, mut head_state) = query.single_mut();
 
-    let mut yaw = cam_state.yaw;
-    let mut pitch = cam_state.pitch;
+    let mut yaw = head_state.yaw;
+    let mut pitch = head_state.pitch;
     yaw -= (delta.x * MOUSE_SENSITIVITY).to_radians();
     pitch -= (delta.y * MOUSE_SENSITIVITY).to_radians();
     pitch = pitch.clamp(0.9 * -FRAC_PI_2, 0.9 * FRAC_PI_2);
 
     transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
-    cam_state.yaw = yaw;
-    cam_state.pitch = pitch;
+    head_state.yaw = yaw;
+    head_state.pitch = pitch;
 }
