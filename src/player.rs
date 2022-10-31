@@ -9,8 +9,13 @@ const PLAYER_HEIGHT_HEAD: f32 = 1.6;
 const PLAYER_INITIAL_POS: Vec3 = Vec3::new(-5.0, PLAYER_HEIGHT / 2.0, -4.0);
 const MOUSE_SENSITIVITY: f32 = 0.15;
 
+// To tag player entity
 #[derive(Component)]
 struct Player;
+
+// To specify which entities should rotate
+#[derive(Component)]
+struct Rotator;
 
 #[derive(Component)]
 struct HeadState {
@@ -47,6 +52,7 @@ fn setup_player(mut commands: Commands) {
             ..default()
         })
         .insert(Player)
+        .insert(Rotator)
         .id();
     // println!("Player entity spawned with id: {}", player.id());
 
@@ -59,6 +65,7 @@ fn setup_player(mut commands: Commands) {
             pitch: 0.0,
             yaw: 0.0,
         })
+        .insert(Rotator)
         .id();
     // println!("Head entity spawned with id: {}", head.id());
 
@@ -70,8 +77,8 @@ fn player_move_system(
     keyboard_input: Res<Input<KeyCode>>,
     query_player: Query<Entity, With<Player>>,
     query_head: Query<Entity, With<HeadState>>,
-    mut query_transforms: Query<&mut Transform, With<Transform>>,
-    mut query_head_state: Query<&mut HeadState, With<HeadState>>,
+    mut query_transforms: Query<&mut Transform, With<Rotator>>,
+    mut query_head_state: Query<&mut HeadState>,
 ) {
     let mut movement_axes = Vec3::ZERO;
     if keyboard_input.any_pressed([KeyCode::W, KeyCode::Up]) {
@@ -98,23 +105,46 @@ fn player_move_system(
     }
 
     let entity_player = query_player.single();
+
+    rotate_player_to_head_yaw(
+        entity_player,
+        &query_head,
+        &mut query_transforms,
+        &mut query_head_state,
+    );
+
+    translate_player(entity_player, &mut query_transforms, movement_axes, &time);
+}
+
+fn rotate_player_to_head_yaw(
+    entity_player: Entity,
+    query_head: &Query<Entity, With<HeadState>>,
+    query_transforms: &mut Query<&mut Transform, With<Rotator>>,
+    query_head_state: &mut Query<&mut HeadState>,
+) {
     let mut head_state = query_head_state.single_mut();
-
-    /* Rotate player to the head direction (only yaw) */
-    if head_state.yaw != 0.0 {
-        // Rotate player body
-        let mut transform_player = query_transforms.get_mut(entity_player).unwrap();
-        transform_player.rotate_y(head_state.yaw);
-
-        // Reset head yaw
-        let entity_head = query_head.single();
-        let mut transform_head = query_transforms.get_mut(entity_head).unwrap();
-        transform_head.rotation = Quat::from_euler(EulerRot::YXZ, 0.0, head_state.pitch, 0.0);
-
-        head_state.yaw = 0.0;
+    if head_state.yaw == 0.0 {
+        return;
     }
 
-    /* Translate Player */
+    // Rotate player body
+    let mut transform_player = query_transforms.get_mut(entity_player).unwrap();
+    transform_player.rotate_y(head_state.yaw);
+
+    // Reset head yaw
+    let entity_head = query_head.single();
+    let mut transform_head = query_transforms.get_mut(entity_head).unwrap();
+    transform_head.rotation = Quat::from_euler(EulerRot::YXZ, 0.0, head_state.pitch, 0.0);
+
+    head_state.yaw = 0.0;
+}
+
+fn translate_player(
+    entity_player: Entity,
+    query_transforms: &mut Query<&mut Transform, With<Rotator>>,
+    movement_axes: Vec3,
+    time: &Res<Time>,
+) {
     let mut transform_player = query_transforms.get_mut(entity_player).unwrap();
 
     //  Calculate movement direction
