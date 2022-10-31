@@ -134,7 +134,7 @@ fn rotate_player_to_head_yaw(
     // Reset head yaw
     let entity_head = query_head.single();
     let mut transform_head = query_transforms.get_mut(entity_head).unwrap();
-    transform_head.rotation = Quat::from_euler(EulerRot::YXZ, 0.0, head_state.pitch, 0.0);
+    transform_head.rotation = Quat::from_rotation_x(head_state.pitch);
 
     head_state.yaw = 0.0;
 }
