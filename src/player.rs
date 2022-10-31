@@ -17,7 +17,7 @@ struct Player;
 #[derive(Component)]
 struct Rotator;
 
-#[derive(Component)]
+#[derive(Component, Default)]
 struct HeadState {
     pitch: f32,
     yaw: f32,
@@ -39,11 +39,8 @@ fn setup_player(mut commands: Commands) {
     let transform_player = Transform::from_translation(PLAYER_INITIAL_POS)
         .looking_at(Vec3::new(0.0, PLAYER_HEIGHT / 2.0, 0.0), Vec3::Y);
 
-    let transform_head = Transform::from_translation(Vec3::new(
-        0.0,
-        PLAYER_HEIGHT / 4.0 + PLAYER_HEIGHT_HEAD / 2.0,
-        0.0,
-    ));
+    let transform_head =
+        Transform::from_xyz(0.0, PLAYER_HEIGHT / 4.0 + PLAYER_HEIGHT_HEAD / 2.0, 0.0);
 
     let player = commands
         .spawn()
@@ -61,10 +58,7 @@ fn setup_player(mut commands: Commands) {
             transform: transform_head,
             ..default()
         })
-        .insert(HeadState {
-            pitch: 0.0,
-            yaw: 0.0,
-        })
+        .insert(HeadState::default())
         .insert(Rotator)
         .id();
     // println!("Head entity spawned with id: {}", head.id());
