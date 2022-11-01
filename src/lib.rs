@@ -8,7 +8,7 @@ const COLOR_CUBE: &str = "FE4A49"; // Tart Orange
 const COLOR_GROUND: &str = "586A6A"; // Deep Space Sparkle
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-enum AppState {
+pub enum AppState {
     InGame,
     Menu,
 }
@@ -36,14 +36,14 @@ fn setup(
     window.set_cursor_visibility(false);
     window.set_cursor_lock_mode(true);
 
-    // ground plane
+    // Create ground plane
     commands.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Plane { size: 10.0 })),
         material: materials.add(Color::hex(COLOR_GROUND).unwrap().into()),
         ..default()
     });
 
-    // cube
+    // Create cube
     commands.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
         material: materials.add(Color::hex(COLOR_CUBE).unwrap().into()),
@@ -51,7 +51,7 @@ fn setup(
         ..default()
     });
 
-    // light
+    // Create light
     commands.spawn_bundle(DirectionalLightBundle {
         directional_light: DirectionalLight {
             shadows_enabled: true,
@@ -62,7 +62,7 @@ fn setup(
     });
 }
 
-fn grab_mouse(
+pub fn grab_mouse(
     mut windows: ResMut<Windows>,
     key: Res<Input<KeyCode>>,
     mut app_state: ResMut<State<AppState>>,

@@ -1,4 +1,4 @@
-use bevy::{input::mouse::MouseMotion, prelude::*};
+use bevy::{input::mouse::MouseMotion, prelude::*, window::close_when_requested};
 use std::f32::consts::FRAC_PI_2;
 
 use crate::AppState;
@@ -7,7 +7,7 @@ const PLAYER_SPEED: f32 = 3.0;
 const PLAYER_HEIGHT: f32 = 1.8;
 const PLAYER_HEIGHT_HEAD: f32 = 1.6;
 const PLAYER_INITIAL_POS: Vec3 = Vec3::new(-5.0, PLAYER_HEIGHT / 2.0, -4.0);
-const MOUSE_SENSITIVITY: f32 = 0.15;
+const MOUSE_SENSITIVITY: f32 = 100.0;
 
 // To tag player entity
 #[derive(Component)]
@@ -29,7 +29,12 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_player).add_system_set(
             SystemSet::on_update(AppState::InGame)
-                .with_system(player_look_system.before(player_move_system))
+                .with_system(
+                    player_look_system
+                        .before(player_move_system)
+                        .after(crate::grab_mouse)
+                        .before(close_when_requested),
+                )
                 .with_system(player_move_system),
         );
     }
@@ -43,8 +48,7 @@ fn setup_player(mut commands: Commands) {
         Transform::from_xyz(0.0, PLAYER_HEIGHT / 4.0 + PLAYER_HEIGHT_HEAD / 2.0, 0.0);
 
     let player = commands
-        .spawn()
-        .insert_bundle(TransformBundle {
+        .spawn_bundle(TransformBundle {
             local: transform_player,
             ..default()
         })
@@ -155,6 +159,7 @@ fn translate_player(
 fn player_look_system(
     mut mouse_motion_events: EventReader<MouseMotion>,
     mut query: Query<(&mut Transform, &mut HeadState), With<HeadState>>,
+    windows: Res<Windows>,
 ) {
     let mut delta = Vec2::ZERO;
     for event in mouse_motion_events.iter() {
@@ -167,10 +172,12 @@ fn player_look_system(
 
     let (mut transform, mut head_state) = query.single_mut();
 
+    let window = windows.get_primary().unwrap();
+
     let mut yaw = head_state.yaw;
     let mut pitch = head_state.pitch;
-    yaw -= (delta.x * MOUSE_SENSITIVITY).to_radians();
-    pitch -= (delta.y * MOUSE_SENSITIVITY).to_radians();
+    yaw -= ((delta.x / window.width()) * MOUSE_SENSITIVITY).to_radians();
+    pitch -= ((delta.y / window.height()) * MOUSE_SENSITIVITY).to_radians();
     pitch = pitch.clamp(0.9 * -FRAC_PI_2, 0.9 * FRAC_PI_2);
 
     transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
