@@ -8,7 +8,7 @@ const COLOR_CUBE: &str = "FE4A49"; // Tart Orange
 const COLOR_GROUND: &str = "586A6A"; // Deep Space Sparkle
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub enum AppState {
+enum AppState {
     InGame,
     Menu,
 }
@@ -21,7 +21,7 @@ impl Plugin for GamePlugin {
             .add_plugin(PlayerPlugin)
             .add_state(AppState::InGame)
             .add_startup_system(setup)
-            .add_system(grab_mouse.before(close_when_requested));
+            .add_system(grab_mouse.label("grab_mouse").before(close_when_requested));
     }
 }
 
@@ -62,7 +62,7 @@ fn setup(
     });
 }
 
-pub fn grab_mouse(
+fn grab_mouse(
     mut windows: ResMut<Windows>,
     key: Res<Input<KeyCode>>,
     mut app_state: ResMut<State<AppState>>,

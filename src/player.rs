@@ -32,7 +32,7 @@ impl Plugin for PlayerPlugin {
                 .with_system(
                     player_look_system
                         .before(player_move_system)
-                        .after(crate::grab_mouse)
+                        .after("grab_mouse")
                         .before(close_when_requested),
                 )
                 .with_system(player_move_system),
