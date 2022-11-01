@@ -1,4 +1,5 @@
 use bevy::{prelude::*, window::close_when_requested};
+use bevy_rapier3d::prelude::*;
 
 mod player;
 use player::PlayerPlugin;
@@ -6,6 +7,9 @@ use player::PlayerPlugin;
 const COLOR_BACKGROUND: &str = "87CEEB"; // Sky Blue
 const COLOR_CUBE: &str = "FE4A49"; // Tart Orange
 const COLOR_GROUND: &str = "586A6A"; // Deep Space Sparkle
+
+const HALF_SIZE_GROUND: f32 = 7.5;
+const HALF_SIZE_CUBE: f32 = 0.5;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 enum AppState {
@@ -18,7 +22,10 @@ pub struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap()))
+            .insert_resource(Msaa::default())
             .add_plugin(PlayerPlugin)
+            .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+            // .add_plugin(RapierDebugRenderPlugin::default())
             .add_state(AppState::InGame)
             .add_startup_system(setup)
             .add_system(grab_mouse.label("grab_mouse").before(close_when_requested));
@@ -37,19 +44,34 @@ fn setup(
     window.set_cursor_lock_mode(true);
 
     // Create ground plane
-    commands.spawn_bundle(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Plane { size: 10.0 })),
-        material: materials.add(Color::hex(COLOR_GROUND).unwrap().into()),
-        ..default()
-    });
+    commands
+        .spawn_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Plane {
+                size: 2.0 * HALF_SIZE_GROUND,
+            })),
+            material: materials.add(Color::hex(COLOR_GROUND).unwrap().into()),
+            ..default()
+        })
+        // .insert(ColliderDebugColor(Color::RED))
+        .insert(Collider::cuboid(HALF_SIZE_GROUND, 0.0, HALF_SIZE_GROUND));
 
     // Create cube
-    commands.spawn_bundle(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-        material: materials.add(Color::hex(COLOR_CUBE).unwrap().into()),
-        transform: Transform::from_xyz(0.0, 0.5, 0.0),
-        ..default()
-    });
+    commands
+        .spawn_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Cube {
+                size: 2.0 * HALF_SIZE_CUBE,
+            })),
+            material: materials.add(Color::hex(COLOR_CUBE).unwrap().into()),
+            transform: Transform::from_xyz(0.0, 3.0, 0.0),
+            ..default()
+        })
+        .insert(RigidBody::Dynamic)
+        // .insert(ColliderDebugColor(Color::BLUE))
+        .insert(Collider::cuboid(
+            HALF_SIZE_CUBE,
+            HALF_SIZE_CUBE,
+            HALF_SIZE_CUBE,
+        ));
 
     // Create light
     commands.spawn_bundle(DirectionalLightBundle {
