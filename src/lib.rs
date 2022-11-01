@@ -21,7 +21,7 @@ impl Plugin for GamePlugin {
             .add_plugin(PlayerPlugin)
             .add_state(AppState::InGame)
             .add_startup_system(setup)
-            .add_system(grab_mouse.before(close_when_requested));
+            .add_system(grab_mouse.label("grab_mouse").before(close_when_requested));
     }
 }
 
@@ -36,14 +36,14 @@ fn setup(
     window.set_cursor_visibility(false);
     window.set_cursor_lock_mode(true);
 
-    // ground plane
+    // Create ground plane
     commands.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Plane { size: 10.0 })),
         material: materials.add(Color::hex(COLOR_GROUND).unwrap().into()),
         ..default()
     });
 
-    // cube
+    // Create cube
     commands.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
         material: materials.add(Color::hex(COLOR_CUBE).unwrap().into()),
@@ -51,7 +51,7 @@ fn setup(
         ..default()
     });
 
-    // light
+    // Create light
     commands.spawn_bundle(DirectionalLightBundle {
         directional_light: DirectionalLight {
             shadows_enabled: true,

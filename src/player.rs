@@ -1,17 +1,24 @@
-use bevy::{input::mouse::MouseMotion, prelude::*};
+use bevy::{input::mouse::MouseMotion, prelude::*, window::close_when_requested};
 use std::f32::consts::FRAC_PI_2;
 
 use crate::AppState;
 
 const PLAYER_SPEED: f32 = 3.0;
 const PLAYER_HEIGHT: f32 = 1.8;
-const MOUSE_SENSITIVITY: f32 = 0.15;
+const PLAYER_HEIGHT_HEAD: f32 = 1.6;
+const PLAYER_INITIAL_POS: Vec3 = Vec3::new(-5.0, PLAYER_HEIGHT / 2.0, -4.0);
+const MOUSE_SENSITIVITY: f32 = 100.0;
 
+// To tag player entity
 #[derive(Component)]
 struct Player;
 
+// To specify which entities should rotate
 #[derive(Component)]
-struct CameraState {
+struct Rotator;
+
+#[derive(Component, Default)]
+struct HeadState {
     pitch: f32,
     yaw: f32,
 }
@@ -22,38 +29,54 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_player).add_system_set(
             SystemSet::on_update(AppState::InGame)
-                .with_system(player_look_system.before(player_move_system))
+                .with_system(
+                    player_look_system
+                        .before(player_move_system)
+                        .after("grab_mouse")
+                        .before(close_when_requested),
+                )
                 .with_system(player_move_system),
         );
     }
 }
 
 fn setup_player(mut commands: Commands) {
-    // Camera
-    let cam_transform = Transform::from_xyz(-5.0, PLAYER_HEIGHT, -4.0).looking_at(
-        Vec3 {
-            x: 0.0,
-            y: PLAYER_HEIGHT,
-            z: 0.0,
-        },
-        Vec3::Y,
-    );
-    commands
-        .spawn_bundle(Camera3dBundle {
-            transform: cam_transform,
+    let transform_player = Transform::from_translation(PLAYER_INITIAL_POS)
+        .looking_at(Vec3::new(0.0, PLAYER_HEIGHT / 2.0, 0.0), Vec3::Y);
+
+    let transform_head =
+        Transform::from_xyz(0.0, PLAYER_HEIGHT / 4.0 + PLAYER_HEIGHT_HEAD / 2.0, 0.0);
+
+    let player = commands
+        .spawn_bundle(TransformBundle {
+            local: transform_player,
             ..default()
         })
         .insert(Player)
-        .insert(CameraState {
-            pitch: 0.0,
-            yaw: cam_transform.rotation.to_euler(EulerRot::YXZ).0,
-        });
+        .insert(Rotator)
+        .id();
+    // println!("Player entity spawned with id: {}", player.id());
+
+    let head = commands
+        .spawn_bundle(Camera3dBundle {
+            transform: transform_head,
+            ..default()
+        })
+        .insert(HeadState::default())
+        .insert(Rotator)
+        .id();
+    // println!("Head entity spawned with id: {}", head.id());
+
+    commands.entity(player).push_children(&[head]);
 }
 
 fn player_move_system(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
-    mut query: Query<&mut Transform, With<Player>>,
+    query_player: Query<Entity, With<Player>>,
+    query_head: Query<Entity, With<HeadState>>,
+    mut query_transforms: Query<&mut Transform, With<Rotator>>,
+    mut query_head_state: Query<&mut HeadState>,
 ) {
     let mut movement_axes = Vec3::ZERO;
     if keyboard_input.any_pressed([KeyCode::W, KeyCode::Up]) {
@@ -79,22 +102,64 @@ fn player_move_system(
         return;
     }
 
-    let mut transform = query.single_mut();
+    let entity_player = query_player.single();
+
+    rotate_player_to_head_yaw(
+        entity_player,
+        &query_head,
+        &mut query_transforms,
+        &mut query_head_state,
+    );
+
+    translate_player(entity_player, &mut query_transforms, movement_axes, &time);
+}
+
+fn rotate_player_to_head_yaw(
+    entity_player: Entity,
+    query_head: &Query<Entity, With<HeadState>>,
+    query_transforms: &mut Query<&mut Transform, With<Rotator>>,
+    query_head_state: &mut Query<&mut HeadState>,
+) {
+    let mut head_state = query_head_state.single_mut();
+    if head_state.yaw == 0.0 {
+        return;
+    }
+
+    // Rotate player body
+    let mut transform_player = query_transforms.get_mut(entity_player).unwrap();
+    transform_player.rotate_y(head_state.yaw);
+
+    // Reset head yaw
+    let entity_head = query_head.single();
+    let mut transform_head = query_transforms.get_mut(entity_head).unwrap();
+    transform_head.rotation = Quat::from_rotation_x(head_state.pitch);
+
+    head_state.yaw = 0.0;
+}
+
+fn translate_player(
+    entity_player: Entity,
+    query_transforms: &mut Query<&mut Transform, With<Rotator>>,
+    movement_axes: Vec3,
+    time: &Res<Time>,
+) {
+    let mut transform_player = query_transforms.get_mut(entity_player).unwrap();
 
     //  Calculate movement direction
-    let movement_direction = movement_axes.z * transform.forward()
-        + movement_axes.x * transform.right()
-        + movement_axes.y * transform.up();
+    let movement_direction = movement_axes.z * transform_player.forward()
+        + movement_axes.x * transform_player.right()
+        + movement_axes.y * transform_player.up();
 
     let movement_direction = movement_direction.normalize();
 
     // Apply translation
-    transform.translation += movement_direction * PLAYER_SPEED * time.delta_seconds();
+    transform_player.translation += movement_direction * PLAYER_SPEED * time.delta_seconds();
 }
 
 fn player_look_system(
     mut mouse_motion_events: EventReader<MouseMotion>,
-    mut query: Query<(&mut Transform, &mut CameraState), With<Player>>,
+    mut query: Query<(&mut Transform, &mut HeadState), With<HeadState>>,
+    windows: Res<Windows>,
 ) {
     let mut delta = Vec2::ZERO;
     for event in mouse_motion_events.iter() {
@@ -105,15 +170,17 @@ fn player_look_system(
         return;
     }
 
-    let (mut transform, mut cam_state) = query.single_mut();
+    let (mut transform, mut head_state) = query.single_mut();
 
-    let mut yaw = cam_state.yaw;
-    let mut pitch = cam_state.pitch;
-    yaw -= (delta.x * MOUSE_SENSITIVITY).to_radians();
-    pitch -= (delta.y * MOUSE_SENSITIVITY).to_radians();
+    let window = windows.get_primary().unwrap();
+
+    let mut yaw = head_state.yaw;
+    let mut pitch = head_state.pitch;
+    yaw -= ((delta.x / window.width()) * MOUSE_SENSITIVITY).to_radians();
+    pitch -= ((delta.y / window.height()) * MOUSE_SENSITIVITY).to_radians();
     pitch = pitch.clamp(0.9 * -FRAC_PI_2, 0.9 * FRAC_PI_2);
 
     transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
-    cam_state.yaw = yaw;
-    cam_state.pitch = pitch;
+    head_state.yaw = yaw;
+    head_state.pitch = pitch;
 }
