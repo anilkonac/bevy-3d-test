@@ -76,23 +76,19 @@ fn ui_graphics(
         );
         ui.end_row();
 
-        let mut shadow_depth_bias = light_point.shadow_depth_bias;
-        let mut shadow_normal_bias = light_point.shadow_normal_bias;
         ui.add(
-            egui::Slider::new(&mut shadow_depth_bias, -0.5..=1.5)
+            egui::Slider::new(&mut light_point.shadow_depth_bias, -0.5..=1.5)
                 .step_by(0.01)
                 .text("Shadow Depth Bias"),
         );
         ui.end_row();
         ui.add(
-            egui::Slider::new(&mut shadow_normal_bias, -1.0..=10.0)
+            egui::Slider::new(&mut light_point.shadow_normal_bias, -1.0..=10.0)
                 .step_by(0.1)
                 .text("Shadow Normal Bias"),
         );
 
-        light_point.shadow_depth_bias = shadow_depth_bias;
-        light_point.shadow_normal_bias = shadow_normal_bias;
-        light_direct.shadow_depth_bias = shadow_depth_bias;
-        light_direct.shadow_normal_bias = shadow_normal_bias;
+        light_direct.shadow_depth_bias = light_point.shadow_depth_bias;
+        light_direct.shadow_normal_bias = light_point.shadow_normal_bias;
     });
 }
