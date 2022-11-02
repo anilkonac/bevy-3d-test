@@ -55,7 +55,6 @@ fn setup_player(mut commands: Commands) {
         .insert(Player)
         .insert(Rotator)
         .id();
-    // println!("Player entity spawned with id: {}", player.id());
 
     let head = commands
         .spawn_bundle(Camera3dBundle {
@@ -65,7 +64,6 @@ fn setup_player(mut commands: Commands) {
         .insert(HeadState::default())
         .insert(Rotator)
         .id();
-    // println!("Head entity spawned with id: {}", head.id());
 
     commands.entity(player).push_children(&[head]);
 }

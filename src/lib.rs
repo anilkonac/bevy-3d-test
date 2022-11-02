@@ -1,4 +1,5 @@
-use bevy::{prelude::*, window::close_when_requested};
+use bevy::{pbr::DirectionalLightShadowMap, prelude::*, window::close_when_requested};
+use bevy_egui::{egui, EguiContext, EguiPlugin};
 use bevy_rapier3d::prelude::*;
 
 mod player;
@@ -23,12 +24,15 @@ impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap()))
             .insert_resource(Msaa::default())
-            .add_plugin(PlayerPlugin)
+            .insert_resource(DirectionalLightShadowMap::default())
+            .add_plugin(EguiPlugin)
             .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
             // .add_plugin(RapierDebugRenderPlugin::default())
+            .add_plugin(PlayerPlugin)
             .add_state(AppState::InGame)
             .add_startup_system(setup)
-            .add_system(grab_mouse.label("grab_mouse").before(close_when_requested));
+            .add_system(grab_mouse.label("grab_mouse").before(close_when_requested))
+            .add_system_set(SystemSet::on_update(AppState::Menu).with_system(ui_graphics));
     }
 }
 
@@ -47,26 +51,24 @@ fn setup(
     commands
         .spawn_bundle(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Plane {
-                size: 2.0 * HALF_SIZE_GROUND,
+                size: HALF_SIZE_GROUND * 2.0,
             })),
             material: materials.add(Color::hex(COLOR_GROUND).unwrap().into()),
             ..default()
         })
-        // .insert(ColliderDebugColor(Color::RED))
         .insert(Collider::cuboid(HALF_SIZE_GROUND, 0.0, HALF_SIZE_GROUND));
 
     // Create cube
     commands
         .spawn_bundle(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Cube {
-                size: 2.0 * HALF_SIZE_CUBE,
+                size: HALF_SIZE_CUBE * 2.0,
             })),
             material: materials.add(Color::hex(COLOR_CUBE).unwrap().into()),
             transform: Transform::from_xyz(0.0, 3.0, 0.0),
             ..default()
         })
         .insert(RigidBody::Dynamic)
-        // .insert(ColliderDebugColor(Color::BLUE))
         .insert(Collider::cuboid(
             HALF_SIZE_CUBE,
             HALF_SIZE_CUBE,
@@ -105,4 +107,26 @@ fn grab_mouse(
             }
         }
     }
+}
+
+fn ui_graphics(
+    mut egui_context: ResMut<EguiContext>,
+    mut msaa: ResMut<Msaa>,
+    mut shadop_map: ResMut<DirectionalLightShadowMap>,
+) {
+    egui::Window::new("Graphics").show(egui_context.ctx_mut(), |ui| {
+        let mut msaa_active = msaa.samples > 1;
+        ui.checkbox(&mut msaa_active, "MSAA");
+        if msaa_active {
+            msaa.samples = 4;
+        } else {
+            msaa.samples = 1;
+        }
+        ui.end_row();
+        ui.add(
+            egui::Slider::new(&mut shadop_map.size, 2048..=2048 * 10)
+                .step_by(2048.0)
+                .text("Shadow Map Size"),
+        );
+    });
 }
