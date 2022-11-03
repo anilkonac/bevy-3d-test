@@ -1,4 +1,4 @@
-use bevy::{prelude::*, window::close_when_requested};
+use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
 mod player;
@@ -29,8 +29,7 @@ impl Plugin for GamePlugin {
             .add_plugin(UIPlugin)
             .add_plugin(PlayerPlugin)
             .add_state(AppState::InGame)
-            .add_startup_system(setup)
-            .add_system(grab_mouse.label("grab_mouse").before(close_when_requested));
+            .add_startup_system(setup);
     }
 }
 
@@ -94,27 +93,4 @@ fn setup(
         },
         ..default()
     });
-}
-
-fn grab_mouse(
-    mut windows: ResMut<Windows>,
-    key: Res<Input<KeyCode>>,
-    mut app_state: ResMut<State<AppState>>,
-) {
-    if key.just_pressed(KeyCode::Escape) {
-        let window = windows.get_primary_mut().unwrap();
-
-        match app_state.current() {
-            AppState::InGame => {
-                window.set_cursor_visibility(true);
-                window.set_cursor_lock_mode(false);
-                app_state.set(AppState::Menu).unwrap();
-            }
-            AppState::Menu => {
-                window.set_cursor_visibility(false);
-                window.set_cursor_lock_mode(true);
-                app_state.set(AppState::InGame).unwrap();
-            }
-        }
-    }
 }
