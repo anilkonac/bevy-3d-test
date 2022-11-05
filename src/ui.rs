@@ -2,9 +2,14 @@ use bevy::{
     pbr::{DirectionalLightShadowMap, PointLightShadowMap},
     {prelude::*, window::close_when_requested},
 };
-use bevy_egui::{egui, EguiContext, EguiPlugin};
+use bevy_egui::{
+    egui::{self, Align2, Ui},
+    EguiContext, EguiPlugin,
+};
 
 use crate::AppState;
+
+const MENU_OFFSET: f32 = 10.0;
 
 #[derive(PartialEq)]
 enum LightType {
@@ -13,13 +18,13 @@ enum LightType {
 }
 
 // Resource
-struct LightPower {
+struct LightSettings {
     light_direct_illuminance: f32,
     light_point_intensity: f32,
     current_light: LightType,
 }
 
-impl Default for LightPower {
+impl Default for LightSettings {
     fn default() -> Self {
         Self {
             light_direct_illuminance: 100000.0,
@@ -34,11 +39,71 @@ pub struct UIPlugin;
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Msaa::default())
-            .insert_resource(LightPower::default())
+            .insert_resource(LightSettings::default())
             .add_plugin(EguiPlugin)
-            .add_system(ui_graphics.before("grab_mouse"))
-            .add_system(grab_mouse.label("grab_mouse").before(close_when_requested));
+            .add_system(ui_info.before(ui_graphics))
+            .add_system_set(
+                SystemSet::on_update(AppState::Menu)
+                    .with_system(ui_graphics.before(close_when_requested)),
+            )
+            .add_system(grab_mouse.label("grab_mouse").before(ui_info));
     }
+}
+
+fn grab_mouse(
+    mut windows: ResMut<Windows>,
+    mut app_state: ResMut<State<AppState>>,
+    key: Res<Input<KeyCode>>,
+    mouse: Res<Input<MouseButton>>,
+) {
+    if key.just_pressed(KeyCode::M) {
+        let window = windows.get_primary_mut().unwrap();
+
+        match app_state.current() {
+            AppState::InGame => {
+                window.set_cursor_visibility(true);
+                window.set_cursor_lock_mode(false);
+                app_state.set(AppState::Menu).unwrap();
+            }
+            AppState::Menu => {
+                window.set_cursor_visibility(false);
+                window.set_cursor_lock_mode(true);
+                app_state.set(AppState::InGame).unwrap();
+            }
+            _ => (),
+        }
+    }
+
+    if mouse.just_pressed(MouseButton::Left) && (*app_state.current() == AppState::Start) {
+        let window = windows.get_primary_mut().unwrap();
+        window.set_cursor_visibility(false);
+        window.set_cursor_lock_mode(true);
+        app_state.set(AppState::InGame).unwrap();
+    }
+}
+
+fn ui_info(mut egui_context: ResMut<EguiContext>, app_state: Res<State<AppState>>) {
+    let contents: fn(&mut Ui) = match app_state.current() {
+        AppState::Start => |ui| {
+            ui.label("Click on the game screen to start");
+        },
+        AppState::Menu => |ui| {
+            ui.label("Press M to close the menu");
+        },
+        AppState::InGame => |ui| {
+            ui.label("- Use the mouse to look");
+            ui.label("- Use WASD or arrow keys to move");
+            ui.label("- Press M for the menu");
+        },
+    };
+
+    egui::Window::new("Info")
+        .id(egui::Id::new("Info"))
+        .collapsible(false)
+        .resizable(false)
+        .anchor(Align2::LEFT_BOTTOM, [MENU_OFFSET, -MENU_OFFSET])
+        .show(egui_context.ctx_mut(), contents);
+    return;
 }
 
 fn ui_graphics(
@@ -50,19 +115,10 @@ fn ui_graphics(
     mut query_light_point: Query<&mut PointLight>,
     mut app_state: ResMut<State<AppState>>,
     mut windows: ResMut<Windows>,
-    mut light_power: ResMut<LightPower>,
+    mut light_power: ResMut<LightSettings>,
 ) {
-    if *app_state.current() == AppState::InGame {
-        egui::Window::new("Press M for the menu")
-            .id(egui::Id::new("graphics"))
-            .collapsible(false)
-            .resizable(false)
-            .show(egui_context.ctx_mut(), |_| {});
-        return;
-    }
-
     egui::Window::new("Graphics")
-        .id(egui::Id::new("graphics"))
+        .anchor(Align2::LEFT_TOP, [MENU_OFFSET, MENU_OFFSET])
         .show(egui_context.ctx_mut(), |ui| {
             const STEP_SIZE_SHADOW_MAP: usize = 1024;
 
@@ -150,44 +206,11 @@ fn ui_graphics(
 
             ui.separator();
 
-            ui.horizontal(|ui| {
-                if ui.button("Close Menu").clicked() {
-                    let window = windows.get_primary_mut().unwrap();
-                    app_state.set(AppState::InGame).unwrap();
-                    window.set_cursor_visibility(false);
-                    window.set_cursor_lock_mode(true);
-                }
-                ui.label("or press M");
-            })
-        });
-}
-
-fn grab_mouse(
-    mut windows: ResMut<Windows>,
-    mut app_state: ResMut<State<AppState>>,
-    key: Res<Input<KeyCode>>,
-    mouse: Res<Input<MouseButton>>,
-) {
-    if key.just_pressed(KeyCode::M) {
-        let window = windows.get_primary_mut().unwrap();
-
-        match app_state.current() {
-            AppState::InGame => {
-                window.set_cursor_visibility(true);
-                window.set_cursor_lock_mode(false);
-                app_state.set(AppState::Menu).unwrap();
-            }
-            AppState::Menu => {
+            if ui.button("Close Menu").clicked() {
+                let window = windows.get_primary_mut().unwrap();
+                app_state.set(AppState::InGame).unwrap();
                 window.set_cursor_visibility(false);
                 window.set_cursor_lock_mode(true);
-                app_state.set(AppState::InGame).unwrap();
             }
-        }
-    }
-
-    if mouse.just_pressed(MouseButton::Left) && (*app_state.current() == AppState::InGame) {
-        let window = windows.get_primary_mut().unwrap();
-        window.set_cursor_visibility(false);
-        window.set_cursor_lock_mode(true);
-    }
+        });
 }

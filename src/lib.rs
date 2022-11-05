@@ -17,6 +17,7 @@ const SHADOW_PROJECTION_SIZE: f32 = 20.0;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 enum AppState {
+    Start,
     InGame,
     Menu,
 }
@@ -30,7 +31,7 @@ impl Plugin for GamePlugin {
             // .add_plugin(RapierDebugRenderPlugin::default())
             .add_plugin(UIPlugin)
             .add_plugin(PlayerPlugin)
-            .add_state(AppState::InGame)
+            .add_state(AppState::Start)
             .add_startup_system(setup);
     }
 }
@@ -39,13 +40,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut windows: ResMut<Windows>,
 ) {
-    // Grab mouse
-    let window = windows.get_primary_mut().unwrap();
-    window.set_cursor_visibility(false);
-    window.set_cursor_lock_mode(true);
-
     // Create ground plane
     commands
         .spawn_bundle(PbrBundle {
