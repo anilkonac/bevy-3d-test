@@ -32,7 +32,7 @@ impl Plugin for GamePlugin {
             .add_plugin(UIPlugin)
             .add_plugin(PlayerPlugin)
             .add_state(AppState::Start)
-            .add_startup_system(setup);
+            .add_startup_system(setup.label("main_setup"));
     }
 }
 

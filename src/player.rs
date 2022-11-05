@@ -9,6 +9,9 @@ const PLAYER_HEIGHT_HEAD: f32 = 1.6;
 const PLAYER_INITIAL_POS: Vec3 = Vec3::new(-5.0, PLAYER_HEIGHT / 2.0, -4.0);
 const MOUSE_SENSITIVITY: f32 = 100.0;
 
+const PLAYER_COLOR_BODY: &str = "A1C084";
+const PLAYER_COLOR_HEAD: &str = "F6F740";
+
 // To tag player entity
 #[derive(Component)]
 struct Player;
@@ -27,29 +30,39 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup_player).add_system_set(
-            SystemSet::on_update(AppState::InGame)
-                .with_system(
-                    player_look_system
-                        .before(player_move_system)
-                        .after("grab_mouse")
-                        .before(close_when_requested),
-                )
-                .with_system(player_move_system),
-        );
+        app.add_startup_system(setup_player.after("main_setup"))
+            .add_system_set(
+                SystemSet::on_update(AppState::InGame)
+                    .with_system(
+                        player_look_system
+                            .before(player_move_system)
+                            .after("grab_mouse")
+                            .before(close_when_requested),
+                    )
+                    .with_system(player_move_system),
+            );
     }
 }
 
-fn setup_player(mut commands: Commands) {
+fn setup_player(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     let transform_player = Transform::from_translation(PLAYER_INITIAL_POS)
         .looking_at(Vec3::new(0.0, PLAYER_HEIGHT / 2.0, 0.0), Vec3::Y);
 
     let transform_head =
         Transform::from_xyz(0.0, PLAYER_HEIGHT / 4.0 + PLAYER_HEIGHT_HEAD / 2.0, 0.0);
 
+    let transform_third_person_cam =
+        Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y);
+
     let player = commands
-        .spawn_bundle(TransformBundle {
-            local: transform_player,
+        .spawn_bundle(PbrBundle {
+            transform: transform_player,
+            mesh: meshes.add(Mesh::from(shape::Box::new(1.0, PLAYER_HEIGHT_HEAD, 0.5))),
+            material: materials.add(Color::hex(PLAYER_COLOR_BODY).unwrap().into()),
             ..default()
         })
         .insert(Player)
@@ -57,13 +70,37 @@ fn setup_player(mut commands: Commands) {
         .id();
 
     let head = commands
-        .spawn_bundle(Camera3dBundle {
+        .spawn_bundle(PbrBundle {
             transform: transform_head,
+            mesh: meshes.add(Mesh::from(shape::Cube::new(0.5))),
+            material: materials.add(Color::hex(PLAYER_COLOR_HEAD).unwrap().into()),
             ..default()
         })
         .insert(HeadState::default())
         .insert(Rotator)
+        .with_children(|parent| {
+            parent.spawn_bundle(Camera3dBundle {
+                camera: Camera {
+                    priority: 0,
+                    ..default()
+                },
+                ..default()
+            });
+        })
         .id();
+
+    let third_person_cam = commands
+        .spawn_bundle(Camera3dBundle {
+            transform: transform_third_person_cam,
+            camera: Camera {
+                priority: 1,
+                ..default()
+            },
+            ..default()
+        })
+        .id();
+
+    commands.entity(head).push_children(&[third_person_cam]);
 
     commands.entity(player).push_children(&[head]);
 }
