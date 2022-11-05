@@ -113,8 +113,6 @@ fn ui_graphics(
     mut shadow_map_point: ResMut<PointLightShadowMap>,
     mut query_light_direct: Query<&mut DirectionalLight>,
     mut query_light_point: Query<&mut PointLight>,
-    mut app_state: ResMut<State<AppState>>,
-    mut windows: ResMut<Windows>,
     mut light_power: ResMut<LightSettings>,
 ) {
     egui::Window::new("Graphics")
@@ -203,14 +201,5 @@ fn ui_graphics(
                 .step_by(STEP_SIZE_SHADOW_MAP as f64)
                 .text("Shadow Map Size"),
             );
-
-            ui.separator();
-
-            if ui.button("Close Menu").clicked() {
-                let window = windows.get_primary_mut().unwrap();
-                app_state.set(AppState::InGame).unwrap();
-                window.set_cursor_visibility(false);
-                window.set_cursor_lock_mode(true);
-            }
         });
 }
