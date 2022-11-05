@@ -13,13 +13,13 @@ enum LightType {
 }
 
 // Resource
-struct LightPower {
+struct LightSettings {
     light_direct_illuminance: f32,
     light_point_intensity: f32,
     current_light: LightType,
 }
 
-impl Default for LightPower {
+impl Default for LightSettings {
     fn default() -> Self {
         Self {
             light_direct_illuminance: 100000.0,
@@ -34,7 +34,7 @@ pub struct UIPlugin;
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Msaa::default())
-            .insert_resource(LightPower::default())
+            .insert_resource(LightSettings::default())
             .add_plugin(EguiPlugin)
             .add_system(ui_graphics.before("grab_mouse"))
             .add_system(grab_mouse.label("grab_mouse").before(close_when_requested));
@@ -50,8 +50,17 @@ fn ui_graphics(
     mut query_light_point: Query<&mut PointLight>,
     mut app_state: ResMut<State<AppState>>,
     mut windows: ResMut<Windows>,
-    mut light_power: ResMut<LightPower>,
+    mut light_power: ResMut<LightSettings>,
 ) {
+    if *app_state.current() == AppState::Start {
+        egui::Window::new("Click on the game screen to start")
+            .id(egui::Id::new("graphics"))
+            .collapsible(false)
+            .resizable(false)
+            .show(egui_context.ctx_mut(), |_| {});
+        return;
+    }
+
     if *app_state.current() == AppState::InGame {
         egui::Window::new("Press M for the menu")
             .id(egui::Id::new("graphics"))
@@ -182,12 +191,14 @@ fn grab_mouse(
                 window.set_cursor_lock_mode(true);
                 app_state.set(AppState::InGame).unwrap();
             }
+            _ => (),
         }
     }
 
-    if mouse.just_pressed(MouseButton::Left) && (*app_state.current() == AppState::InGame) {
+    if mouse.just_pressed(MouseButton::Left) && (*app_state.current() == AppState::Start) {
         let window = windows.get_primary_mut().unwrap();
         window.set_cursor_visibility(false);
         window.set_cursor_lock_mode(true);
+        app_state.set(AppState::InGame).unwrap();
     }
 }
