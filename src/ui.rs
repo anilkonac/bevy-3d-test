@@ -12,13 +12,29 @@ enum LightType {
     Directional,
 }
 
+// Resource
+struct LightPower {
+    light_direct_illuminance: f32,
+    light_point_intensity: f32,
+    current_light: LightType,
+}
+
+impl Default for LightPower {
+    fn default() -> Self {
+        Self {
+            light_direct_illuminance: 100000.0,
+            light_point_intensity: 800.0,
+            current_light: LightType::Directional,
+        }
+    }
+}
+
 pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Msaa::default())
-            .insert_resource(DirectionalLightShadowMap::default())
-            .insert_resource(PointLightShadowMap::default())
+            .insert_resource(LightPower::default())
             .add_plugin(EguiPlugin)
             .add_system(ui_graphics.before("grab_mouse"))
             .add_system(grab_mouse.label("grab_mouse").before(close_when_requested));
@@ -34,6 +50,7 @@ fn ui_graphics(
     mut query_light_point: Query<&mut PointLight>,
     mut app_state: ResMut<State<AppState>>,
     mut windows: ResMut<Windows>,
+    mut light_power: ResMut<LightPower>,
 ) {
     if *app_state.current() == AppState::InGame {
         egui::Window::new("Press M for the menu")
@@ -61,56 +78,75 @@ fn ui_graphics(
             let mut light_point = query_light_point.single_mut();
             let mut light_direct = query_light_direct.single_mut();
 
-            let mut light_type = match light_point.intensity {
-                x if x > 0.0 => LightType::Point,
-                _ => LightType::Directional,
-            };
-
             ui.horizontal(|ui| {
-                ui.radio_value(&mut light_type, LightType::Point, "Point");
-                ui.radio_value(&mut light_type, LightType::Directional, "Directional");
+                ui.radio_value(&mut light_power.current_light, LightType::Point, "Point");
+                ui.radio_value(
+                    &mut light_power.current_light,
+                    LightType::Directional,
+                    "Directional",
+                );
                 ui.label("Light Type");
             });
 
-            let shadow_map_size = match light_type {
+            let show_shadow_projection: bool;
+            let shadow_map_size = match light_power.current_light {
                 LightType::Point => {
                     light_direct.illuminance = 0.0;
-                    light_point.intensity = 800.0;
+                    show_shadow_projection = false;
+                    ui.add(
+                        egui::Slider::new(&mut light_power.light_point_intensity, 0.0..=4000.0)
+                            .text("Intensity"),
+                    );
+                    light_point.intensity = light_power.light_point_intensity;
                     &mut shadow_map_point.size
                 }
                 LightType::Directional => {
-                    light_direct.illuminance = 100000.0;
                     light_point.intensity = 0.0;
+                    show_shadow_projection = true;
+                    ui.add(
+                        egui::Slider::new(
+                            &mut light_power.light_direct_illuminance,
+                            0.0..=100000.0,
+                        )
+                        .text("Illuminance"),
+                    );
+                    light_direct.illuminance = light_power.light_direct_illuminance;
                     &mut shadow_map_direct.size
                 }
             };
 
             ui.separator();
 
+            let mut shadow_projection_size = light_direct.shadow_projection.right;
+
+            ui.add_enabled_ui(show_shadow_projection, |ui| {
+                ui.add(
+                    egui::Slider::new(&mut shadow_projection_size, 0.0..=200.0)
+                        .text("Shadow Projection Size"),
+                );
+            });
+            if show_shadow_projection {
+                light_direct.shadow_projection = OrthographicProjection {
+                    left: -shadow_projection_size,
+                    right: shadow_projection_size,
+                    bottom: -shadow_projection_size,
+                    top: shadow_projection_size,
+                    near: -shadow_projection_size,
+                    far: shadow_projection_size,
+                    ..default()
+                };
+            }
+
+            ui.end_row();
+
             ui.add(
                 egui::Slider::new(
                     shadow_map_size,
-                    STEP_SIZE_SHADOW_MAP..=STEP_SIZE_SHADOW_MAP * 10,
+                    STEP_SIZE_SHADOW_MAP..=STEP_SIZE_SHADOW_MAP * 8,
                 )
                 .step_by(STEP_SIZE_SHADOW_MAP as f64)
                 .text("Shadow Map Size"),
             );
-            ui.end_row();
-
-            ui.add(
-                egui::Slider::new(&mut light_point.shadow_depth_bias, -0.5..=1.5)
-                    .step_by(0.01)
-                    .text("Shadow Depth Bias"),
-            );
-            ui.end_row();
-            ui.add(
-                egui::Slider::new(&mut light_point.shadow_normal_bias, -1.0..=10.0)
-                    .step_by(0.1)
-                    .text("Shadow Normal Bias"),
-            );
-
-            light_direct.shadow_depth_bias = light_point.shadow_depth_bias;
-            light_direct.shadow_normal_bias = light_point.shadow_normal_bias;
 
             ui.separator();
 

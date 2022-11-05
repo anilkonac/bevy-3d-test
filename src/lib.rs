@@ -13,6 +13,8 @@ const COLOR_GROUND: &str = "586A6A"; // Deep Space Sparkle
 const HALF_SIZE_GROUND: f32 = 7.5;
 const HALF_SIZE_CUBE: f32 = 0.5;
 
+const SHADOW_PROJECTION_SIZE: f32 = 20.0;
+
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 enum AppState {
     InGame,
@@ -75,20 +77,29 @@ fn setup(
     // Create lights
     let transform_lights = Transform::from_xyz(-3.0, 5.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y);
 
-    commands.spawn_bundle(PointLightBundle {
+    commands.spawn_bundle(DirectionalLightBundle {
         transform: transform_lights,
-        point_light: PointLight {
+        directional_light: DirectionalLight {
             shadows_enabled: true,
+            shadow_projection: OrthographicProjection {
+                left: -SHADOW_PROJECTION_SIZE,
+                right: SHADOW_PROJECTION_SIZE,
+                bottom: -SHADOW_PROJECTION_SIZE,
+                top: SHADOW_PROJECTION_SIZE,
+                near: -SHADOW_PROJECTION_SIZE,
+                far: SHADOW_PROJECTION_SIZE,
+                ..default()
+            },
             ..default()
         },
         ..default()
     });
 
-    commands.spawn_bundle(DirectionalLightBundle {
+    commands.spawn_bundle(PointLightBundle {
         transform: transform_lights,
-        directional_light: DirectionalLight {
+        point_light: PointLight {
             shadows_enabled: true,
-            illuminance: 0.0,
+            intensity: 0.0,
             ..default()
         },
         ..default()
