@@ -30,7 +30,7 @@ struct LightSettings {
 
 impl Default for LightSettings {
     fn default() -> Self {
-        Self {
+        LightSettings {
             light_direct_illuminance: 100000.0,
             light_point_intensity: 800.0,
             current_light: LightType::Directional,
