@@ -29,10 +29,10 @@ impl Plugin for GamePlugin {
         app.insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap()))
             .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
             // .add_plugin(RapierDebugRenderPlugin::default())
-            .add_plugin(UIPlugin)
             .add_plugin(PlayerPlugin)
+            .add_plugin(UIPlugin)
             .add_state(AppState::Start)
-            .add_startup_system(setup);
+            .add_startup_system(setup.label("main_setup"));
     }
 }
 

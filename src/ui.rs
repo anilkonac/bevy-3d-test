@@ -3,13 +3,11 @@ use bevy::{
     {prelude::*, window::close_when_requested},
 };
 use bevy_egui::{
-    egui::{self, Align2, Ui},
+    egui::{self, Ui},
     EguiContext, EguiPlugin,
 };
 
 use crate::AppState;
-
-const MENU_OFFSET: f32 = 10.0;
 
 #[derive(PartialEq)]
 enum LightType {
@@ -17,7 +15,13 @@ enum LightType {
     Directional,
 }
 
-// Resource
+#[derive(PartialEq, Clone, Copy)]
+enum CameraType {
+    FirstPerson,
+    ThirdPerson,
+}
+
+// Resources
 struct LightSettings {
     light_direct_illuminance: f32,
     light_point_intensity: f32,
@@ -26,7 +30,7 @@ struct LightSettings {
 
 impl Default for LightSettings {
     fn default() -> Self {
-        Self {
+        LightSettings {
             light_direct_illuminance: 100000.0,
             light_point_intensity: 800.0,
             current_light: LightType::Directional,
@@ -34,17 +38,21 @@ impl Default for LightSettings {
     }
 }
 
+struct CameraSettings(CameraType);
+
 pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Msaa::default())
             .insert_resource(LightSettings::default())
+            .insert_resource(CameraSettings(CameraType::ThirdPerson))
             .add_plugin(EguiPlugin)
             .add_system(ui_info.before(ui_graphics))
             .add_system_set(
                 SystemSet::on_update(AppState::Menu)
-                    .with_system(ui_graphics.before(close_when_requested)),
+                    .with_system(ui_graphics.before(ui_camera))
+                    .with_system(ui_camera.before(close_when_requested)),
             )
             .add_system(grab_mouse.label("grab_mouse").before(ui_info));
     }
@@ -101,7 +109,6 @@ fn ui_info(mut egui_context: ResMut<EguiContext>, app_state: Res<State<AppState>
         .id(egui::Id::new("Info"))
         .collapsible(false)
         .resizable(false)
-        .anchor(Align2::LEFT_BOTTOM, [MENU_OFFSET, -MENU_OFFSET])
         .show(egui_context.ctx_mut(), contents);
     return;
 }
@@ -115,91 +122,108 @@ fn ui_graphics(
     mut query_light_point: Query<&mut PointLight>,
     mut light_power: ResMut<LightSettings>,
 ) {
-    egui::Window::new("Graphics")
-        .anchor(Align2::LEFT_TOP, [MENU_OFFSET, MENU_OFFSET])
-        .show(egui_context.ctx_mut(), |ui| {
-            const STEP_SIZE_SHADOW_MAP: usize = 1024;
+    egui::Window::new("Graphics").show(egui_context.ctx_mut(), |ui| {
+        const STEP_SIZE_SHADOW_MAP: usize = 1024;
 
-            let mut msaa_active = msaa.samples > 1;
-            ui.checkbox(&mut msaa_active, "MSAA");
-            if msaa_active {
-                msaa.samples = 4;
-            } else {
-                msaa.samples = 1;
-            }
-            ui.separator();
+        let mut msaa_active = msaa.samples > 1;
+        ui.checkbox(&mut msaa_active, "MSAA");
+        if msaa_active {
+            msaa.samples = 4;
+        } else {
+            msaa.samples = 1;
+        }
+        ui.separator();
 
-            let mut light_point = query_light_point.single_mut();
-            let mut light_direct = query_light_direct.single_mut();
+        let mut light_point = query_light_point.single_mut();
+        let mut light_direct = query_light_direct.single_mut();
 
-            ui.horizontal(|ui| {
-                ui.radio_value(&mut light_power.current_light, LightType::Point, "Point");
-                ui.radio_value(
-                    &mut light_power.current_light,
-                    LightType::Directional,
-                    "Directional",
-                );
-                ui.label("Light Type");
-            });
-
-            let show_shadow_projection: bool;
-            let shadow_map_size = match light_power.current_light {
-                LightType::Point => {
-                    light_direct.illuminance = 0.0;
-                    show_shadow_projection = false;
-                    ui.add(
-                        egui::Slider::new(&mut light_power.light_point_intensity, 0.0..=4000.0)
-                            .text("Intensity"),
-                    );
-                    light_point.intensity = light_power.light_point_intensity;
-                    &mut shadow_map_point.size
-                }
-                LightType::Directional => {
-                    light_point.intensity = 0.0;
-                    show_shadow_projection = true;
-                    ui.add(
-                        egui::Slider::new(
-                            &mut light_power.light_direct_illuminance,
-                            0.0..=100000.0,
-                        )
-                        .text("Illuminance"),
-                    );
-                    light_direct.illuminance = light_power.light_direct_illuminance;
-                    &mut shadow_map_direct.size
-                }
-            };
-
-            ui.separator();
-
-            let mut shadow_projection_size = light_direct.shadow_projection.right;
-
-            ui.add_enabled_ui(show_shadow_projection, |ui| {
-                ui.add(
-                    egui::Slider::new(&mut shadow_projection_size, 0.0..=200.0)
-                        .text("Shadow Projection Size"),
-                );
-            });
-            if show_shadow_projection {
-                light_direct.shadow_projection = OrthographicProjection {
-                    left: -shadow_projection_size,
-                    right: shadow_projection_size,
-                    bottom: -shadow_projection_size,
-                    top: shadow_projection_size,
-                    near: -shadow_projection_size,
-                    far: shadow_projection_size,
-                    ..default()
-                };
-            }
-
-            ui.end_row();
-
-            ui.add(
-                egui::Slider::new(
-                    shadow_map_size,
-                    STEP_SIZE_SHADOW_MAP..=STEP_SIZE_SHADOW_MAP * 8,
-                )
-                .step_by(STEP_SIZE_SHADOW_MAP as f64)
-                .text("Shadow Map Size"),
+        ui.horizontal(|ui| {
+            ui.radio_value(&mut light_power.current_light, LightType::Point, "Point");
+            ui.radio_value(
+                &mut light_power.current_light,
+                LightType::Directional,
+                "Directional",
             );
+            ui.label("Light Type");
+        });
+
+        let show_shadow_projection: bool;
+        let shadow_map_size = match light_power.current_light {
+            LightType::Point => {
+                light_direct.illuminance = 0.0;
+                show_shadow_projection = false;
+                ui.add(
+                    egui::Slider::new(&mut light_power.light_point_intensity, 0.0..=4000.0)
+                        .text("Intensity"),
+                );
+                light_point.intensity = light_power.light_point_intensity;
+                &mut shadow_map_point.size
+            }
+            LightType::Directional => {
+                light_point.intensity = 0.0;
+                show_shadow_projection = true;
+                ui.add(
+                    egui::Slider::new(&mut light_power.light_direct_illuminance, 0.0..=100000.0)
+                        .text("Illuminance"),
+                );
+                light_direct.illuminance = light_power.light_direct_illuminance;
+                &mut shadow_map_direct.size
+            }
+        };
+
+        ui.separator();
+
+        let mut shadow_projection_size = light_direct.shadow_projection.right;
+
+        ui.add_enabled_ui(show_shadow_projection, |ui| {
+            ui.add(
+                egui::Slider::new(&mut shadow_projection_size, 0.0..=200.0)
+                    .text("Shadow Projection Size"),
+            );
+        });
+        if show_shadow_projection {
+            light_direct.shadow_projection = OrthographicProjection {
+                left: -shadow_projection_size,
+                right: shadow_projection_size,
+                bottom: -shadow_projection_size,
+                top: shadow_projection_size,
+                near: -shadow_projection_size,
+                far: shadow_projection_size,
+                ..default()
+            };
+        }
+
+        ui.end_row();
+
+        ui.add(
+            egui::Slider::new(
+                shadow_map_size,
+                STEP_SIZE_SHADOW_MAP..=STEP_SIZE_SHADOW_MAP * 8,
+            )
+            .step_by(STEP_SIZE_SHADOW_MAP as f64)
+            .text("Shadow Map Size"),
+        );
+    });
+}
+
+fn ui_camera(
+    mut egui_context: ResMut<EguiContext>,
+    mut cam_settings: ResMut<CameraSettings>,
+    mut query_cams: Query<&mut Camera>,
+) {
+    egui::Window::new("Camera")
+        .id(egui::Id::new("Camera"))
+        .show(egui_context.ctx_mut(), |ui| {
+            ui.horizontal(|ui| {
+                let cam_settings_prev = cam_settings.0;
+                ui.radio_value(&mut cam_settings.0, CameraType::FirstPerson, "First Person");
+                ui.radio_value(&mut cam_settings.0, CameraType::ThirdPerson, "Third Person");
+
+                if cam_settings_prev != cam_settings.0 {
+                    for mut cam in query_cams.iter_mut() {
+                        cam.is_active = !cam.is_active;
+                    }
+                }
+            });
         });
 }
