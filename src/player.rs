@@ -95,7 +95,7 @@ fn setup_player(
             parent.spawn_bundle(Camera3dBundle {
                 transform: Transform::from_xyz(0.0, 0.0, -HEAD_SIZE / 2.0),
                 camera: Camera {
-                    priority: 0,
+                    is_active: false,
                     ..default()
                 },
                 ..default()
@@ -106,10 +106,6 @@ fn setup_player(
     let third_person_cam = commands
         .spawn_bundle(Camera3dBundle {
             transform: transform_third_person_cam,
-            camera: Camera {
-                priority: 1,
-                ..default()
-            },
             ..default()
         })
         .id();

@@ -15,7 +15,7 @@ enum LightType {
     Directional,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 enum CameraType {
     FirstPerson,
     ThirdPerson,
@@ -215,23 +215,13 @@ fn ui_camera(
         .id(egui::Id::new("Camera"))
         .show(egui_context.ctx_mut(), |ui| {
             ui.horizontal(|ui| {
-                let mut changed = false;
-                changed |= ui
-                    .radio_value(&mut cam_settings.0, CameraType::FirstPerson, "First Person")
-                    .changed();
-                changed |= ui
-                    .radio_value(&mut cam_settings.0, CameraType::ThirdPerson, "Third Person")
-                    .changed();
+                let cam_settings_prev = cam_settings.0;
+                ui.radio_value(&mut cam_settings.0, CameraType::FirstPerson, "First Person");
+                ui.radio_value(&mut cam_settings.0, CameraType::ThirdPerson, "Third Person");
 
-                if !changed {
-                    return;
-                }
-
-                for mut cam in query_cams.iter_mut() {
-                    match cam.priority {
-                        0 => cam.priority = 1,
-                        1 => cam.priority = 0,
-                        _ => (),
+                if cam_settings_prev != cam_settings.0 {
+                    for mut cam in query_cams.iter_mut() {
+                        cam.is_active = !cam.is_active;
                     }
                 }
             });
