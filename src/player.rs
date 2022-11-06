@@ -5,9 +5,16 @@ use crate::AppState;
 
 const PLAYER_SPEED: f32 = 3.0;
 const PLAYER_HEIGHT: f32 = 1.8;
-const PLAYER_HEIGHT_HEAD: f32 = 1.6;
+const PLAYER_HEAD_ALT: f32 = 1.6;
 const PLAYER_INITIAL_POS: Vec3 = Vec3::new(-5.0, PLAYER_HEIGHT / 2.0, -4.0);
+const HEAD_SIZE: f32 = (PLAYER_HEIGHT - PLAYER_HEAD_ALT) * 2.0;
+const TORSO_WIDTH: f32 = HEAD_SIZE * 2.0;
+const TORSO_HEIGHT: f32 = PLAYER_HEAD_ALT / 2.0;
+const TORSO_ALT_RELATIVE: f32 = 0.0;
 const MOUSE_SENSITIVITY: f32 = 100.0;
+
+const COLOR_PLAYER_BODY: &str = "A1C084"; // Olivine
+const COLOR_PLAYER_HEAD: &str = "F6F740"; // Maximum Yellow
 
 // To tag player entity
 #[derive(Component)]
@@ -27,44 +34,83 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup_player).add_system_set(
-            SystemSet::on_update(AppState::InGame)
-                .with_system(
-                    player_look_system
-                        .before(player_move_system)
-                        .after("grab_mouse")
-                        .before(close_when_requested),
-                )
-                .with_system(player_move_system),
-        );
+        app.add_startup_system(setup_player.after("main_setup"))
+            .add_system_set(
+                SystemSet::on_update(AppState::InGame)
+                    .with_system(
+                        player_look_system
+                            .before(player_move_system)
+                            .after("grab_mouse")
+                            .before(close_when_requested),
+                    )
+                    .with_system(player_move_system),
+            );
     }
 }
 
-fn setup_player(mut commands: Commands) {
+fn setup_player(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     let transform_player = Transform::from_translation(PLAYER_INITIAL_POS)
         .looking_at(Vec3::new(0.0, PLAYER_HEIGHT / 2.0, 0.0), Vec3::Y);
 
-    let transform_head =
-        Transform::from_xyz(0.0, PLAYER_HEIGHT / 4.0 + PLAYER_HEIGHT_HEAD / 2.0, 0.0);
+    let transform_head = Transform::from_xyz(0.0, PLAYER_HEAD_ALT - PLAYER_HEIGHT / 2.0, 0.0);
+
+    let transform_third_person_cam =
+        Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y);
 
     let player = commands
-        .spawn_bundle(TransformBundle {
-            local: transform_player,
+        .spawn_bundle(SpatialBundle {
+            transform: transform_player,
             ..default()
         })
         .insert(Player)
         .insert(Rotator)
+        .with_children(|parent| {
+            parent.spawn_bundle(PbrBundle {
+                transform: Transform::from_xyz(0.0, TORSO_ALT_RELATIVE, 0.0),
+                mesh: meshes.add(Mesh::from(shape::Box::new(
+                    TORSO_WIDTH,
+                    TORSO_HEIGHT,
+                    HEAD_SIZE,
+                ))),
+                material: materials.add(Color::hex(COLOR_PLAYER_BODY).unwrap().into()),
+                ..default()
+            });
+        })
         .id();
 
     let head = commands
-        .spawn_bundle(Camera3dBundle {
+        .spawn_bundle(PbrBundle {
             transform: transform_head,
+            mesh: meshes.add(Mesh::from(shape::Cube::new(HEAD_SIZE))),
+            material: materials.add(Color::hex(COLOR_PLAYER_HEAD).unwrap().into()),
             ..default()
         })
         .insert(HeadState::default())
         .insert(Rotator)
+        .with_children(|parent| {
+            parent.spawn_bundle(Camera3dBundle {
+                transform: Transform::from_xyz(0.0, 0.0, -HEAD_SIZE / 2.0),
+                camera: Camera {
+                    is_active: false,
+                    ..default()
+                },
+                ..default()
+            });
+        })
         .id();
 
+    let third_person_cam = commands
+        .spawn_bundle(Camera3dBundle {
+            transform: transform_third_person_cam,
+            ..default()
+        })
+        .id();
+
+    commands.entity(head).push_children(&[third_person_cam]);
     commands.entity(player).push_children(&[head]);
 }
 
@@ -176,7 +222,7 @@ fn player_look_system(
     let mut pitch = head_state.pitch;
     yaw -= ((delta.x / window.width()) * MOUSE_SENSITIVITY).to_radians();
     pitch -= ((delta.y / window.height()) * MOUSE_SENSITIVITY).to_radians();
-    pitch = pitch.clamp(0.9 * -FRAC_PI_2, 0.9 * FRAC_PI_2);
+    pitch = pitch.clamp(-0.9 * FRAC_PI_2, 0.9 * FRAC_PI_2);
 
     transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
     head_state.yaw = yaw;
