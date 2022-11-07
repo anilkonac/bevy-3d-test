@@ -54,7 +54,8 @@ impl Plugin for UIPlugin {
                     .with_system(ui_graphics.before(ui_camera))
                     .with_system(ui_camera.before(close_when_requested)),
             )
-            .add_system(grab_mouse.label("grab_mouse").before(ui_info));
+            .add_system(grab_mouse.label("grab_mouse").before(ui_info))
+            .add_system(switch_camera.before(ui_camera));
     }
 }
 
@@ -96,12 +97,13 @@ fn ui_info(mut egui_context: ResMut<EguiContext>, app_state: Res<State<AppState>
             ui.label("Click on the game screen to start");
         },
         AppState::Menu => |ui| {
-            ui.label("Press M to close the menu");
+            ui.label("Press M to close all menus");
         },
         AppState::InGame => |ui| {
             ui.label("- Use the mouse to look");
             ui.label("- Use WASD or arrow keys to move");
-            ui.label("- Press M for the menu");
+            ui.label("- Press C to switch camera");
+            ui.label("- Press M for the settings menu");
         },
     };
 
@@ -111,6 +113,23 @@ fn ui_info(mut egui_context: ResMut<EguiContext>, app_state: Res<State<AppState>
         .resizable(false)
         .show(egui_context.ctx_mut(), contents);
     return;
+}
+
+fn switch_camera(
+    key: Res<Input<KeyCode>>,
+    mut cam_settings: ResMut<CameraSettings>,
+    mut query_cams: Query<&mut Camera>,
+) {
+    if key.just_pressed(KeyCode::C) {
+        cam_settings.0 = match cam_settings.0 {
+            CameraType::FirstPerson => CameraType::ThirdPerson,
+            CameraType::ThirdPerson => CameraType::FirstPerson,
+        };
+
+        for mut cam in query_cams.iter_mut() {
+            cam.is_active = !cam.is_active;
+        }
+    }
 }
 
 fn ui_graphics(
