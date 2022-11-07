@@ -249,7 +249,7 @@ fn ui_camera(
             }
 
             ui.horizontal(|ui| {
-                ui.label("Camera Distance");
+                ui.label("Camera Distance (Squared)");
                 match cam_settings.0 {
                     CameraType::ThirdPerson => {
                         let translation = &transform.translation;
@@ -306,7 +306,7 @@ fn ui_camera(
 }
 
 fn compute_new_transform(old_translation: &Vec3, new_distance_sq: f32) -> Box<Transform> {
-    let tan_alpha = old_translation.z / old_translation.x;
+    let tan_alpha = old_translation.z / old_translation.y;
     let tan_alpha_sq = tan_alpha * tan_alpha;
     Box::new(
         Transform::from_xyz(
