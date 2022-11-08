@@ -8,11 +8,13 @@ const PLAYER_HEIGHT: f32 = 1.8;
 const PLAYER_HEAD_ALT: f32 = 1.6;
 const PLAYER_INITIAL_POS: Vec3 = Vec3::new(-5.0, PLAYER_HEIGHT / 2.0, -4.0);
 pub const HEAD_SIZE_2: f32 = PLAYER_HEIGHT - PLAYER_HEAD_ALT;
-pub const HEAD_SIZE: f32 = HEAD_SIZE_2 * 2.0;
+const HEAD_SIZE: f32 = HEAD_SIZE_2 * 2.0;
 const TORSO_WIDTH: f32 = HEAD_SIZE * 2.0;
 const TORSO_HEIGHT: f32 = PLAYER_HEAD_ALT / 2.0;
 const TORSO_ALT_RELATIVE: f32 = 0.0;
 const MOUSE_SENSITIVITY: f32 = 100.0;
+const CAMERA_FPS_POS_RELATIVE: Vec3 = Vec3::new(0.0, 0.0, -HEAD_SIZE_2 * 3.0 / 4.0);
+pub const CAMERA_TPS_POS_RELATIVE: Vec3 = Vec3::new(0.0, 2.0, 5.0);
 
 const COLOR_PLAYER_BODY: &str = "A1C084"; // Olivine
 const COLOR_PLAYER_HEAD: &str = "F6F740"; // Maximum Yellow
@@ -60,7 +62,7 @@ fn setup_player(
     let transform_head = Transform::from_xyz(0.0, PLAYER_HEAD_ALT - PLAYER_HEIGHT / 2.0, 0.0);
 
     let transform_third_person_cam =
-        Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y);
+        Transform::from_translation(CAMERA_TPS_POS_RELATIVE).looking_at(Vec3::ZERO, Vec3::Y);
 
     let player = commands
         .spawn_bundle(SpatialBundle {
@@ -94,7 +96,7 @@ fn setup_player(
         .insert(Rotator)
         .with_children(|parent| {
             parent.spawn_bundle(Camera3dBundle {
-                transform: Transform::from_xyz(0.0, 0.0, -HEAD_SIZE_2 * 3.0 / 4.0),
+                transform: Transform::from_translation(CAMERA_FPS_POS_RELATIVE),
                 camera: Camera {
                     is_active: false,
                     ..default()
