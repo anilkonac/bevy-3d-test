@@ -7,7 +7,8 @@ const PLAYER_SPEED: f32 = 3.0;
 const PLAYER_HEIGHT: f32 = 1.8;
 const PLAYER_HEAD_ALT: f32 = 1.6;
 const PLAYER_INITIAL_POS: Vec3 = Vec3::new(-5.0, PLAYER_HEIGHT / 2.0, -4.0);
-pub const HEAD_SIZE: f32 = (PLAYER_HEIGHT - PLAYER_HEAD_ALT) * 2.0;
+pub const HEAD_SIZE_2: f32 = PLAYER_HEIGHT - PLAYER_HEAD_ALT;
+pub const HEAD_SIZE: f32 = HEAD_SIZE_2 * 2.0;
 const TORSO_WIDTH: f32 = HEAD_SIZE * 2.0;
 const TORSO_HEIGHT: f32 = PLAYER_HEAD_ALT / 2.0;
 const TORSO_ALT_RELATIVE: f32 = 0.0;
@@ -54,7 +55,7 @@ fn setup_player(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let transform_player = Transform::from_translation(PLAYER_INITIAL_POS)
-        .looking_at(Vec3::new(0.0, PLAYER_HEIGHT / 2.0, 0.0), Vec3::Y);
+        .looking_at(Vec3::new(0.0, PLAYER_INITIAL_POS.y, 0.0), Vec3::Y);
 
     let transform_head = Transform::from_xyz(0.0, PLAYER_HEAD_ALT - PLAYER_HEIGHT / 2.0, 0.0);
 
@@ -93,7 +94,7 @@ fn setup_player(
         .insert(Rotator)
         .with_children(|parent| {
             parent.spawn_bundle(Camera3dBundle {
-                transform: Transform::from_xyz(0.0, 0.0, -HEAD_SIZE / 2.0),
+                transform: Transform::from_xyz(0.0, 0.0, -HEAD_SIZE_2 * 3.0 / 4.0),
                 camera: Camera {
                     is_active: false,
                     ..default()

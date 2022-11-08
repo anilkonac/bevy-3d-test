@@ -7,7 +7,7 @@ use bevy_egui::{
     EguiContext, EguiPlugin,
 };
 
-use crate::{player::HEAD_SIZE, AppState};
+use crate::{player::HEAD_SIZE_2, AppState};
 
 #[derive(PartialEq)]
 enum LightType {
@@ -112,7 +112,6 @@ fn ui_info(mut egui_context: ResMut<EguiContext>, app_state: Res<State<AppState>
         .collapsible(false)
         .resizable(false)
         .show(egui_context.ctx_mut(), contents);
-    return;
 }
 
 fn switch_camera(
@@ -248,25 +247,34 @@ fn ui_camera(
                 continue;
             }
 
-            ui.horizontal(|ui| {
-                ui.label("Camera Distance (Squared)");
-                match cam_settings.0 {
-                    CameraType::ThirdPerson => {
-                        let translation = &transform.translation;
-                        let mut cur_distance_sq = translation.distance_squared(Vec3::ZERO);
-                        if ui.add(egui::DragValue::new(&mut cur_distance_sq)).changed() {
-                            let new_transform = compute_new_transform(translation, cur_distance_sq);
-                            if new_transform.translation.distance_squared(Vec3::ZERO) >= 1.0 {
-                                *transform = *new_transform;
-                            }
+            ui.horizontal(|ui| match cam_settings.0 {
+                CameraType::ThirdPerson => {
+                    ui.label("Camera Distance (Squared)");
+                    let translation = &transform.translation;
+                    let mut cur_distance_sq = translation.distance_squared(Vec3::ZERO);
+                    if ui.add(egui::DragValue::new(&mut cur_distance_sq)).changed() {
+                        let new_transform: Transform;
+                        if (translation.x == 0.0) && (translation.z == 0.0) {
+                            new_transform =
+                                Transform::from_translation(Vec3::Y * cur_distance_sq.sqrt())
+                                    .looking_at(Vec3::ZERO, Vec3::Y);
+                        } else if translation.x == 0.0 {
+                            new_transform =
+                                compute_new_transform_without_x(translation, cur_distance_sq);
+                        } else {
+                            new_transform = compute_new_transform(translation, cur_distance_sq);
+                        }
+                        if new_transform.translation.distance_squared(Vec3::ZERO) >= 1.0 {
+                            *transform = new_transform;
                         }
                     }
-                    CameraType::FirstPerson => {
-                        ui.add(
-                            egui::Slider::new(&mut transform.translation.z, -HEAD_SIZE..=HEAD_SIZE)
-                                .step_by(0.05),
-                        );
-                    }
+                }
+                CameraType::FirstPerson => {
+                    ui.label("Camera Distance");
+                    ui.add(
+                        egui::Slider::new(&mut transform.translation.z, -HEAD_SIZE_2..=HEAD_SIZE_2)
+                            .step_by(0.05),
+                    );
                 }
             });
 
@@ -305,15 +313,31 @@ fn ui_camera(
         .show(egui_context.ctx_mut(), contents);
 }
 
-fn compute_new_transform(old_translation: &Vec3, new_distance_sq: f32) -> Box<Transform> {
-    let tan_alpha = old_translation.z / old_translation.y;
+#[inline]
+fn compute_new_transform_without_x(old_trans: &Vec3, new_distance_sq: f32) -> Transform {
+    let tan_beta = old_trans.y / old_trans.z;
+    let tan_beta_sq = tan_beta * tan_beta;
+    let z_sq = new_distance_sq / (1.0 + tan_beta_sq);
+    let z = z_sq.sqrt();
+    let y = z * tan_beta;
+
+    Transform::from_xyz(0.0, y, z).looking_at(Vec3::ZERO, Vec3::Y)
+}
+
+#[inline]
+fn compute_new_transform(old_trans: &Vec3, new_distance_sq: f32) -> Transform {
+    // Of course, there has to be a better approach.
+    let tan_alpha = old_trans.z / old_trans.x;
     let tan_alpha_sq = tan_alpha * tan_alpha;
-    Box::new(
-        Transform::from_xyz(
-            old_translation.x,
-            (new_distance_sq / (1.0 + tan_alpha_sq)).sqrt(),
-            (new_distance_sq * tan_alpha_sq / (1.0 + tan_alpha_sq)).sqrt(),
-        )
-        .looking_at(Vec3::ZERO, Vec3::Y),
-    )
+    let d1_sq = old_trans.x * old_trans.x + old_trans.z * old_trans.z;
+    let tan_beta_sq = old_trans.y * old_trans.y / d1_sq;
+
+    let x_sq = new_distance_sq / ((1.0 + tan_alpha_sq) * (1.0 + tan_beta_sq));
+    let x = x_sq.sqrt() * old_trans.x.signum();
+    let z_sq = x_sq * tan_alpha_sq;
+    let z = x * tan_alpha;
+    let y_sq = (x_sq + z_sq) * tan_beta_sq;
+    let y = y_sq.sqrt() * old_trans.y.signum();
+
+    Transform::from_xyz(x, y, z).looking_at(Vec3::ZERO, Vec3::Y)
 }
