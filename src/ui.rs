@@ -7,7 +7,10 @@ use bevy_egui::{
     EguiContext, EguiPlugin,
 };
 
-use crate::AppState;
+use crate::{
+    player::{CAMERA_TPS_POS_RELATIVE, HEAD_SIZE_2},
+    AppState,
+};
 
 #[derive(PartialEq)]
 enum LightType {
@@ -38,7 +41,19 @@ impl Default for LightSettings {
     }
 }
 
-struct CameraSettings(CameraType);
+struct CameraSettings {
+    c_type: CameraType,
+    distance: f32,
+}
+
+impl Default for CameraSettings {
+    fn default() -> Self {
+        CameraSettings {
+            c_type: CameraType::ThirdPerson,
+            distance: CAMERA_TPS_POS_RELATIVE.distance(Vec3::ZERO),
+        }
+    }
+}
 
 pub struct UIPlugin;
 
@@ -46,7 +61,7 @@ impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Msaa::default())
             .insert_resource(LightSettings::default())
-            .insert_resource(CameraSettings(CameraType::ThirdPerson))
+            .insert_resource(CameraSettings::default())
             .add_plugin(EguiPlugin)
             .add_system(ui_info.before(ui_graphics))
             .add_system_set(
@@ -112,7 +127,6 @@ fn ui_info(mut egui_context: ResMut<EguiContext>, app_state: Res<State<AppState>
         .collapsible(false)
         .resizable(false)
         .show(egui_context.ctx_mut(), contents);
-    return;
 }
 
 fn switch_camera(
@@ -121,7 +135,7 @@ fn switch_camera(
     mut query_cams: Query<&mut Camera>,
 ) {
     if key.just_pressed(KeyCode::C) {
-        cam_settings.0 = match cam_settings.0 {
+        cam_settings.c_type = match cam_settings.c_type {
             CameraType::FirstPerson => CameraType::ThirdPerson,
             CameraType::ThirdPerson => CameraType::FirstPerson,
         };
@@ -228,21 +242,130 @@ fn ui_graphics(
 fn ui_camera(
     mut egui_context: ResMut<EguiContext>,
     mut cam_settings: ResMut<CameraSettings>,
-    mut query_cams: Query<&mut Camera>,
+    mut query_cams: Query<(&mut Camera, &mut Transform), With<Camera>>,
 ) {
-    egui::Window::new("Camera")
-        .id(egui::Id::new("Camera"))
-        .show(egui_context.ctx_mut(), |ui| {
-            ui.horizontal(|ui| {
-                let cam_settings_prev = cam_settings.0;
-                ui.radio_value(&mut cam_settings.0, CameraType::FirstPerson, "First Person");
-                ui.radio_value(&mut cam_settings.0, CameraType::ThirdPerson, "Third Person");
+    let contents = |ui: &mut Ui| {
+        ui.horizontal(|ui| {
+            let cam_settings_prev = cam_settings.c_type;
+            ui.radio_value(
+                &mut cam_settings.c_type,
+                CameraType::FirstPerson,
+                "First Person",
+            );
+            ui.radio_value(
+                &mut cam_settings.c_type,
+                CameraType::ThirdPerson,
+                "Third Person",
+            );
 
-                if cam_settings_prev != cam_settings.0 {
-                    for mut cam in query_cams.iter_mut() {
-                        cam.is_active = !cam.is_active;
+            if cam_settings_prev != cam_settings.c_type {
+                for (mut cam, _) in query_cams.iter_mut() {
+                    cam.is_active = !cam.is_active;
+                }
+            }
+        });
+
+        for (cam, mut transform) in query_cams.iter_mut() {
+            if !cam.is_active {
+                continue;
+            }
+
+            ui.horizontal(|ui| match cam_settings.c_type {
+                CameraType::ThirdPerson => {
+                    ui.label("Camera Distance");
+                    let translation = &transform.translation;
+                    let distance = &mut cam_settings.distance;
+                    if ui
+                        .add(egui::DragValue::new(distance).clamp_range(1.0..=200.0))
+                        .changed()
+                    {
+                        let new_transform: Transform;
+                        if (translation.x == 0.0) && (translation.z == 0.0) {
+                            new_transform = Transform::from_translation(Vec3::Y * *distance)
+                                .looking_at(Vec3::ZERO, -Vec3::Z);
+                        } else if translation.x == 0.0 {
+                            new_transform = compute_new_transform_without_x(translation, *distance);
+                        } else {
+                            new_transform = compute_new_transform(translation, *distance);
+                        }
+                        *transform = new_transform;
                     }
                 }
+                CameraType::FirstPerson => {
+                    ui.label("Camera Distance");
+                    ui.add(
+                        egui::Slider::new(&mut transform.translation.z, -HEAD_SIZE_2..=HEAD_SIZE_2)
+                            .step_by(0.05),
+                    );
+                }
             });
-        });
+
+            if cam_settings.c_type == CameraType::ThirdPerson {
+                let translation = &mut transform.translation;
+
+                ui.label("Camera Translation");
+                let mut changed = false;
+                ui.horizontal(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("X");
+                        changed |= ui.add(egui::DragValue::new(&mut translation.x)).changed();
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Y");
+                        changed |= ui.add(egui::DragValue::new(&mut translation.y)).changed();
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Z");
+                        changed |= ui.add(egui::DragValue::new(&mut translation.z)).changed();
+                    })
+                });
+
+                if !changed {
+                    continue;
+                }
+
+                cam_settings.distance = translation.distance(Vec3::ZERO);
+                if translation.x == 0.0 && translation.z == 0.0 {
+                    *transform =
+                        Transform::from_translation(*translation).looking_at(Vec3::ZERO, -Vec3::Z);
+                } else {
+                    *transform =
+                        Transform::from_translation(*translation).looking_at(Vec3::ZERO, Vec3::Y);
+                }
+            }
+        }
+    };
+
+    egui::Window::new("Camera")
+        .id(egui::Id::new("Camera"))
+        .show(egui_context.ctx_mut(), contents);
+}
+
+#[inline]
+fn compute_new_transform_without_x(old_trans: &Vec3, new_distance: f32) -> Transform {
+    let tan_beta = old_trans.y / old_trans.z;
+    let tan_beta_sq = tan_beta * tan_beta;
+    let z_sq = new_distance * new_distance / (1.0 + tan_beta_sq);
+    let z = z_sq.sqrt() * old_trans.z.signum();
+    let y = z * tan_beta;
+
+    Transform::from_xyz(0.0, y, z).looking_at(Vec3::ZERO, Vec3::Y)
+}
+
+#[inline]
+fn compute_new_transform(old_trans: &Vec3, new_distance: f32) -> Transform {
+    // Of course, there has to be a better approach.
+    let tan_alpha = old_trans.z / old_trans.x;
+    let tan_alpha_sq = tan_alpha * tan_alpha;
+    let d1_sq = old_trans.x * old_trans.x + old_trans.z * old_trans.z;
+    let tan_beta_sq = old_trans.y * old_trans.y / d1_sq;
+
+    let x_sq = new_distance * new_distance / ((1.0 + tan_alpha_sq) * (1.0 + tan_beta_sq));
+    let x = x_sq.sqrt() * old_trans.x.signum();
+    let z_sq = x_sq * tan_alpha_sq;
+    let z = x * tan_alpha;
+    let y_sq = (x_sq + z_sq) * tan_beta_sq;
+    let y = y_sq.sqrt() * old_trans.y.signum();
+
+    Transform::from_xyz(x, y, z).looking_at(Vec3::ZERO, Vec3::Y)
 }
