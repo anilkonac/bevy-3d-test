@@ -99,4 +99,9 @@ fn setup(
         },
         ..default()
     });
+
+    commands.insert_resource(AmbientLight {
+        color: Color::hex(COLOR_BACKGROUND).unwrap(),
+        brightness: 0.1,
+    })
 }

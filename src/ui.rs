@@ -154,8 +154,10 @@ fn ui_graphics(
     mut query_light_direct: Query<&mut DirectionalLight>,
     mut query_light_point: Query<&mut PointLight>,
     mut light_power: ResMut<LightSettings>,
+    mut clear_color: ResMut<ClearColor>,
+    mut ambient_light: ResMut<AmbientLight>,
 ) {
-    static STEP_SIZE_SHADOW_MAP: usize = 1024;
+    const STEP_SIZE_SHADOW_MAP: usize = 1024;
 
     let contents = |ui: &mut Ui| {
         let mut msaa_active = msaa.samples > 1;
@@ -166,6 +168,29 @@ fn ui_graphics(
             msaa.samples = 1;
         }
         ui.separator();
+
+        let mut color_clear_rgba = clear_color.as_rgba_f32();
+        ui.horizontal(|ui| {
+            ui.label("Clear Color");
+            ui.color_edit_button_rgba_unmultiplied(&mut color_clear_rgba);
+        });
+        clear_color.0 = Color::from(color_clear_rgba);
+
+        ui.separator();
+
+        ui.label("Ambient Light ");
+        let mut color_ambient_rgba = ambient_light.color.as_rgba_f32();
+        ui.horizontal(|ui| {
+            ui.label("Color");
+            ui.color_edit_button_rgba_unmultiplied(&mut color_ambient_rgba);
+            ui.label("Brightness");
+            ui.add(egui::Slider::new(&mut ambient_light.brightness, 0.0..=1.0).step_by(0.05));
+        });
+        ambient_light.color = Color::from(color_ambient_rgba);
+
+        ui.separator();
+
+        ui.end_row();
 
         let mut light_point = query_light_point.single_mut();
         let mut light_direct = query_light_direct.single_mut();
@@ -180,10 +205,15 @@ fn ui_graphics(
             ui.label("Light Type");
         });
 
+        ui.end_row();
+
         let show_shadow_projection: bool;
         let shadow_map_size = match light_power.current_light {
             LightType::Point => {
                 light_direct.illuminance = 0.0;
+                let mut color = light_point.color.as_rgba_f32();
+                ui.color_edit_button_rgba_unmultiplied(&mut color);
+                light_point.color = Color::from(color);
                 show_shadow_projection = false;
                 ui.add(
                     egui::Slider::new(&mut light_power.light_point_intensity, 0.0..=4000.0)
@@ -194,6 +224,9 @@ fn ui_graphics(
             }
             LightType::Directional => {
                 light_point.intensity = 0.0;
+                let mut color = light_direct.color.as_rgba_f32();
+                ui.color_edit_button_rgba_unmultiplied(&mut color);
+                light_direct.color = Color::from(color);
                 show_shadow_projection = true;
                 ui.add(
                     egui::Slider::new(&mut light_power.light_direct_illuminance, 0.0..=100000.0)
