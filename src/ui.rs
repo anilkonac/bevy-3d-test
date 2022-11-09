@@ -155,9 +155,9 @@ fn ui_graphics(
     mut query_light_point: Query<&mut PointLight>,
     mut light_power: ResMut<LightSettings>,
 ) {
-    egui::Window::new("Graphics").show(egui_context.ctx_mut(), |ui| {
-        const STEP_SIZE_SHADOW_MAP: usize = 1024;
+    static STEP_SIZE_SHADOW_MAP: usize = 1024;
 
+    let contents = |ui: &mut Ui| {
         let mut msaa_active = msaa.samples > 1;
         ui.checkbox(&mut msaa_active, "MSAA");
         if msaa_active {
@@ -236,7 +236,9 @@ fn ui_graphics(
             .step_by(STEP_SIZE_SHADOW_MAP as f64)
             .text("Shadow Map Size"),
         );
-    });
+    };
+
+    egui::Window::new("Graphics").show(egui_context.ctx_mut(), contents);
 }
 
 fn ui_camera(
@@ -265,6 +267,8 @@ fn ui_camera(
             }
         });
 
+        ui.separator();
+
         for (cam, mut transform) in query_cams.iter_mut() {
             if !cam.is_active {
                 continue;
@@ -272,7 +276,7 @@ fn ui_camera(
 
             ui.horizontal(|ui| match cam_settings.c_type {
                 CameraType::ThirdPerson => {
-                    ui.label("Camera Distance");
+                    ui.label("Distance");
                     let translation = &transform.translation;
                     let distance = &mut cam_settings.distance;
                     if ui
@@ -292,7 +296,7 @@ fn ui_camera(
                     }
                 }
                 CameraType::FirstPerson => {
-                    ui.label("Camera Distance");
+                    ui.label("Distance");
                     ui.add(
                         egui::Slider::new(&mut transform.translation.z, -HEAD_SIZE_2..=HEAD_SIZE_2)
                             .step_by(0.05),
@@ -301,9 +305,10 @@ fn ui_camera(
             });
 
             if cam_settings.c_type == CameraType::ThirdPerson {
+                ui.separator();
                 let translation = &mut transform.translation;
 
-                ui.label("Camera Translation");
+                ui.label("Translation");
                 let mut changed = false;
                 ui.horizontal(|ui| {
                     ui.horizontal(|ui| {
