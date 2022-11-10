@@ -5,10 +5,11 @@ use crate::AppState;
 
 const PLAYER_SPEED: f32 = 3.0;
 const PLAYER_HEIGHT: f32 = 1.8;
+const PLAYER_HEIGHT_2: f32 = PLAYER_HEIGHT / 2.0;
 const PLAYER_HEAD_ALT: f32 = 1.6;
-const PLAYER_INITIAL_POS: Vec3 = Vec3::new(-5.0, PLAYER_HEIGHT / 2.0, -4.0);
-pub const HEAD_SIZE_2: f32 = PLAYER_HEIGHT - PLAYER_HEAD_ALT;
-const HEAD_SIZE: f32 = HEAD_SIZE_2 * 2.0;
+const PLAYER_INITIAL_POS: Vec3 = Vec3::new(-5.0, PLAYER_HEIGHT_2, -4.0);
+const HEAD_SIZE_2: f32 = PLAYER_HEIGHT - PLAYER_HEAD_ALT;
+pub const HEAD_SIZE: f32 = HEAD_SIZE_2 * 2.0;
 const TORSO_WIDTH: f32 = HEAD_SIZE * 2.0;
 const TORSO_HEIGHT: f32 = PLAYER_HEAD_ALT / 2.0;
 const TORSO_ALT_RELATIVE: f32 = 0.0;
@@ -59,7 +60,7 @@ fn setup_player(
     let transform_player = Transform::from_translation(PLAYER_INITIAL_POS)
         .looking_at(Vec3::new(0.0, PLAYER_INITIAL_POS.y, 0.0), Vec3::Y);
 
-    let transform_head = Transform::from_xyz(0.0, PLAYER_HEAD_ALT - PLAYER_HEIGHT / 2.0, 0.0);
+    let transform_head = Transform::from_xyz(0.0, PLAYER_HEAD_ALT - PLAYER_HEIGHT_2, 0.0);
 
     let transform_third_person_cam =
         Transform::from_translation(CAMERA_TPS_POS_RELATIVE).looking_at(Vec3::ZERO, Vec3::Y);

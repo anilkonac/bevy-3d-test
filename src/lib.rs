@@ -13,7 +13,9 @@ const COLOR_GROUND: &str = "586A6A"; // Deep Space Sparkle
 const HALF_SIZE_GROUND: f32 = 7.5;
 const HALF_SIZE_CUBE: f32 = 0.5;
 
-const SHADOW_PROJECTION_SIZE: f32 = 20.0;
+const SHADOW_PROJECTION_SIZE: f32 = HALF_SIZE_GROUND * 1.42/*~=2.0.sqrt()*/;
+
+const TRANSLATION_LIGHT_POINT_SPOT: Vec3 = Vec3::new(-2.0, 2.5, 1.0);
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 enum AppState {
@@ -26,7 +28,8 @@ pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap()))
+        app.insert_resource(Msaa::default())
+            .insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap()))
             .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
             // .add_plugin(RapierDebugRenderPlugin::default())
             .add_plugin(PlayerPlugin)
@@ -70,10 +73,13 @@ fn setup(
         ));
 
     // Create lights
-    let transform_lights = Transform::from_xyz(-3.0, 5.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y);
+    let transform_light_point = Transform::from_translation(TRANSLATION_LIGHT_POINT_SPOT);
+    let transform_light_spot =
+        Transform::from_translation(TRANSLATION_LIGHT_POINT_SPOT).looking_at(Vec3::ZERO, Vec3::Y);
+    let transform_light_direct = Transform::from_rotation(transform_light_spot.rotation);
 
     commands.spawn_bundle(DirectionalLightBundle {
-        transform: transform_lights,
+        transform: transform_light_direct,
         directional_light: DirectionalLight {
             shadows_enabled: true,
             shadow_projection: OrthographicProjection {
@@ -91,7 +97,7 @@ fn setup(
     });
 
     commands.spawn_bundle(PointLightBundle {
-        transform: transform_lights,
+        transform: transform_light_point,
         point_light: PointLight {
             shadows_enabled: true,
             intensity: 0.0,
@@ -99,4 +105,19 @@ fn setup(
         },
         ..default()
     });
+
+    commands.spawn_bundle(SpotLightBundle {
+        transform: transform_light_spot,
+        spot_light: SpotLight {
+            shadows_enabled: true,
+            intensity: 0.0,
+            ..default()
+        },
+        ..default()
+    });
+
+    commands.insert_resource(AmbientLight {
+        color: Color::hex(COLOR_BACKGROUND).unwrap(),
+        brightness: 0.1,
+    })
 }

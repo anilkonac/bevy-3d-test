@@ -8,14 +8,15 @@ use bevy_egui::{
 };
 
 use crate::{
-    player::{CAMERA_TPS_POS_RELATIVE, HEAD_SIZE_2},
+    player::{CAMERA_TPS_POS_RELATIVE, HEAD_SIZE},
     AppState,
 };
 
 #[derive(PartialEq)]
 enum LightType {
-    Point,
     Directional,
+    Point,
+    Spot,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -28,7 +29,8 @@ enum CameraType {
 struct LightSettings {
     light_direct_illuminance: f32,
     light_point_intensity: f32,
-    current_light: LightType,
+    light_spot_intensity: f32,
+    current_type: LightType,
 }
 
 impl Default for LightSettings {
@@ -36,7 +38,8 @@ impl Default for LightSettings {
         LightSettings {
             light_direct_illuminance: 100000.0,
             light_point_intensity: 800.0,
-            current_light: LightType::Directional,
+            light_spot_intensity: 800.0,
+            current_type: LightType::Directional,
         }
     }
 }
@@ -59,8 +62,7 @@ pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(Msaa::default())
-            .insert_resource(LightSettings::default())
+        app.insert_resource(LightSettings::default())
             .insert_resource(CameraSettings::default())
             .add_plugin(EguiPlugin)
             .add_system(ui_info.before(ui_graphics))
@@ -148,87 +150,132 @@ fn switch_camera(
 
 fn ui_graphics(
     mut egui_context: ResMut<EguiContext>,
-    mut msaa: ResMut<Msaa>,
     mut shadow_map_direct: ResMut<DirectionalLightShadowMap>,
     mut shadow_map_point: ResMut<PointLightShadowMap>,
     mut query_light_direct: Query<&mut DirectionalLight>,
     mut query_light_point: Query<&mut PointLight>,
-    mut light_power: ResMut<LightSettings>,
+    mut query_light_spot: Query<&mut SpotLight>,
+    mut light_settings: ResMut<LightSettings>,
+    mut clear_color: ResMut<ClearColor>,
+    mut ambient_light: ResMut<AmbientLight>,
 ) {
-    egui::Window::new("Graphics").show(egui_context.ctx_mut(), |ui| {
-        const STEP_SIZE_SHADOW_MAP: usize = 1024;
+    const STEP_SIZE_SHADOW_MAP: usize = 1024;
 
-        let mut msaa_active = msaa.samples > 1;
-        ui.checkbox(&mut msaa_active, "MSAA");
-        if msaa_active {
-            msaa.samples = 4;
-        } else {
-            msaa.samples = 1;
-        }
-        ui.separator();
-
-        let mut light_point = query_light_point.single_mut();
+    let contents = |ui: &mut Ui| {
         let mut light_direct = query_light_direct.single_mut();
+        let mut light_point = query_light_point.single_mut();
+        let mut light_spot = query_light_spot.single_mut();
+
+        let mut color_rgba_clear = clear_color.as_rgba_f32();
+        let mut color_rgba_ambient = ambient_light.color.as_rgba_f32();
 
         ui.horizontal(|ui| {
-            ui.radio_value(&mut light_power.current_light, LightType::Point, "Point");
+            ui.label("Clear Color");
+            ui.color_edit_button_rgba_unmultiplied(&mut color_rgba_clear);
+            ui.label("Sync with");
+            if ui.button("Ambient").clicked() {
+                color_rgba_ambient = color_rgba_clear;
+            }
+            if ui.button("Light").clicked() {
+                light_point.color = Color::from(color_rgba_clear);
+                light_direct.color = Color::from(color_rgba_clear);
+                light_spot.color = Color::from(color_rgba_clear);
+            }
+        });
+        clear_color.0 = Color::from(color_rgba_clear);
+
+        ui.separator();
+
+        ui.label("Ambient Light ");
+        ui.horizontal(|ui| {
+            ui.label("Color");
+            ui.color_edit_button_rgba_unmultiplied(&mut color_rgba_ambient);
+            ui.label("Brightness");
+            ui.add(egui::Slider::new(&mut ambient_light.brightness, 0.0..=1.0).step_by(0.01));
+        });
+        ambient_light.color = Color::from(color_rgba_ambient);
+
+        ui.separator();
+
+        ui.end_row();
+
+        ui.horizontal(|ui| {
             ui.radio_value(
-                &mut light_power.current_light,
+                &mut light_settings.current_type,
                 LightType::Directional,
                 "Directional",
             );
+            ui.radio_value(&mut light_settings.current_type, LightType::Point, "Point");
+            ui.radio_value(&mut light_settings.current_type, LightType::Spot, "Spot");
+
             ui.label("Light Type");
         });
 
-        let show_shadow_projection: bool;
-        let shadow_map_size = match light_power.current_light {
-            LightType::Point => {
-                light_direct.illuminance = 0.0;
-                show_shadow_projection = false;
-                ui.add(
-                    egui::Slider::new(&mut light_power.light_point_intensity, 0.0..=4000.0)
-                        .text("Intensity"),
-                );
-                light_point.intensity = light_power.light_point_intensity;
-                &mut shadow_map_point.size
-            }
+        ui.end_row();
+
+        // TODO: Reduce duplicate code
+        let shadow_map_size = match light_settings.current_type {
             LightType::Directional => {
+                // Disable other lights
                 light_point.intensity = 0.0;
-                show_shadow_projection = true;
+                light_spot.intensity = 0.0;
+
+                let mut color = light_direct.color.as_rgba_f32();
+                ui.horizontal(|ui| {
+                    ui.label("Color");
+                    ui.color_edit_button_rgba_unmultiplied(&mut color);
+                });
+                light_direct.color = Color::from(color);
                 ui.add(
-                    egui::Slider::new(&mut light_power.light_direct_illuminance, 0.0..=100000.0)
+                    egui::Slider::new(&mut light_settings.light_direct_illuminance, 0.0..=100000.0)
                         .text("Illuminance"),
                 );
-                light_direct.illuminance = light_power.light_direct_illuminance;
+                light_direct.illuminance = light_settings.light_direct_illuminance;
                 &mut shadow_map_direct.size
+            }
+            LightType::Point => {
+                // Disable other lights
+                light_direct.illuminance = 0.0;
+                light_spot.intensity = 0.0;
+
+                let mut color = light_point.color.as_rgba_f32();
+                ui.horizontal(|ui| {
+                    ui.label("Color");
+                    ui.color_edit_button_rgba_unmultiplied(&mut color);
+                });
+
+                light_point.color = Color::from(color);
+                ui.add(
+                    egui::Slider::new(&mut light_settings.light_point_intensity, 0.0..=4000.0)
+                        .text("Intensity"),
+                );
+                light_point.intensity = light_settings.light_point_intensity;
+                &mut shadow_map_point.size
+            }
+            LightType::Spot => {
+                // Disable other lights
+                light_direct.illuminance = 0.0;
+                light_point.intensity = 0.0;
+
+                let mut color = light_spot.color.as_rgba_f32();
+                ui.horizontal(|ui| {
+                    ui.label("Color");
+                    ui.color_edit_button_rgba_unmultiplied(&mut color);
+                });
+                light_spot.color = Color::from(color);
+                ui.add(
+                    egui::Slider::new(&mut light_settings.light_spot_intensity, 0.0..=4000.0)
+                        .text("Intensity"),
+                );
+                light_spot.intensity = light_settings.light_spot_intensity;
+                &mut shadow_map_point.size
             }
         };
 
         ui.separator();
 
-        let mut shadow_projection_size = light_direct.shadow_projection.right;
-
-        ui.add_enabled_ui(show_shadow_projection, |ui| {
-            ui.add(
-                egui::Slider::new(&mut shadow_projection_size, 0.0..=200.0)
-                    .text("Shadow Projection Size"),
-            );
-        });
-        if show_shadow_projection {
-            light_direct.shadow_projection = OrthographicProjection {
-                left: -shadow_projection_size,
-                right: shadow_projection_size,
-                bottom: -shadow_projection_size,
-                top: shadow_projection_size,
-                near: -shadow_projection_size,
-                far: shadow_projection_size,
-                ..default()
-            };
-        }
-
-        ui.end_row();
-
-        ui.add(
+        ui.add_enabled(
+            light_settings.current_type != LightType::Spot,
             egui::Slider::new(
                 shadow_map_size,
                 STEP_SIZE_SHADOW_MAP..=STEP_SIZE_SHADOW_MAP * 8,
@@ -236,7 +283,9 @@ fn ui_graphics(
             .step_by(STEP_SIZE_SHADOW_MAP as f64)
             .text("Shadow Map Size"),
         );
-    });
+    };
+
+    egui::Window::new("Graphics").show(egui_context.ctx_mut(), contents);
 }
 
 fn ui_camera(
@@ -265,6 +314,8 @@ fn ui_camera(
             }
         });
 
+        ui.separator();
+
         for (cam, mut transform) in query_cams.iter_mut() {
             if !cam.is_active {
                 continue;
@@ -272,7 +323,7 @@ fn ui_camera(
 
             ui.horizontal(|ui| match cam_settings.c_type {
                 CameraType::ThirdPerson => {
-                    ui.label("Camera Distance");
+                    ui.label("Distance");
                     let translation = &transform.translation;
                     let distance = &mut cam_settings.distance;
                     if ui
@@ -292,18 +343,19 @@ fn ui_camera(
                     }
                 }
                 CameraType::FirstPerson => {
-                    ui.label("Camera Distance");
+                    ui.label("Distance");
                     ui.add(
-                        egui::Slider::new(&mut transform.translation.z, -HEAD_SIZE_2..=HEAD_SIZE_2)
+                        egui::Slider::new(&mut transform.translation.z, -HEAD_SIZE..=HEAD_SIZE)
                             .step_by(0.05),
                     );
                 }
             });
 
             if cam_settings.c_type == CameraType::ThirdPerson {
+                ui.separator();
                 let translation = &mut transform.translation;
 
-                ui.label("Camera Translation");
+                ui.label("Translation");
                 let mut changed = false;
                 ui.horizontal(|ui| {
                     ui.horizontal(|ui| {
