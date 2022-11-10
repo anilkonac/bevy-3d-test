@@ -8,7 +8,7 @@ use bevy_egui::{
 };
 
 use crate::{
-    player::{CAMERA_TPS_POS_RELATIVE, HEAD_SIZE_2},
+    player::{CAMERA_TPS_POS_RELATIVE, HEAD_SIZE},
     AppState,
 };
 
@@ -59,8 +59,7 @@ pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(Msaa::default())
-            .insert_resource(LightSettings::default())
+        app.insert_resource(LightSettings::default())
             .insert_resource(CameraSettings::default())
             .add_plugin(EguiPlugin)
             .add_system(ui_info.before(ui_graphics))
@@ -148,7 +147,6 @@ fn switch_camera(
 
 fn ui_graphics(
     mut egui_context: ResMut<EguiContext>,
-    mut msaa: ResMut<Msaa>,
     mut shadow_map_direct: ResMut<DirectionalLightShadowMap>,
     mut shadow_map_point: ResMut<PointLightShadowMap>,
     mut query_light_direct: Query<&mut DirectionalLight>,
@@ -160,40 +158,40 @@ fn ui_graphics(
     const STEP_SIZE_SHADOW_MAP: usize = 1024;
 
     let contents = |ui: &mut Ui| {
-        let mut msaa_active = msaa.samples > 1;
-        ui.checkbox(&mut msaa_active, "MSAA");
-        if msaa_active {
-            msaa.samples = 4;
-        } else {
-            msaa.samples = 1;
-        }
-        ui.separator();
+        let mut light_point = query_light_point.single_mut();
+        let mut light_direct = query_light_direct.single_mut();
 
-        let mut color_clear_rgba = clear_color.as_rgba_f32();
+        let mut color_rgba_clear = clear_color.as_rgba_f32();
+        let mut color_rgba_ambient = ambient_light.color.as_rgba_f32();
+
         ui.horizontal(|ui| {
             ui.label("Clear Color");
-            ui.color_edit_button_rgba_unmultiplied(&mut color_clear_rgba);
+            ui.color_edit_button_rgba_unmultiplied(&mut color_rgba_clear);
+            ui.label("Sync with");
+            if ui.button("Ambient").clicked() {
+                color_rgba_ambient = color_rgba_clear;
+            }
+            if ui.button("Light").clicked() {
+                light_point.color = Color::from(color_rgba_clear);
+                light_direct.color = Color::from(color_rgba_clear);
+            }
         });
-        clear_color.0 = Color::from(color_clear_rgba);
+        clear_color.0 = Color::from(color_rgba_clear);
 
         ui.separator();
 
         ui.label("Ambient Light ");
-        let mut color_ambient_rgba = ambient_light.color.as_rgba_f32();
         ui.horizontal(|ui| {
             ui.label("Color");
-            ui.color_edit_button_rgba_unmultiplied(&mut color_ambient_rgba);
+            ui.color_edit_button_rgba_unmultiplied(&mut color_rgba_ambient);
             ui.label("Brightness");
-            ui.add(egui::Slider::new(&mut ambient_light.brightness, 0.0..=1.0).step_by(0.05));
+            ui.add(egui::Slider::new(&mut ambient_light.brightness, 0.0..=5.0).step_by(0.005));
         });
-        ambient_light.color = Color::from(color_ambient_rgba);
+        ambient_light.color = Color::from(color_rgba_ambient);
 
         ui.separator();
 
         ui.end_row();
-
-        let mut light_point = query_light_point.single_mut();
-        let mut light_direct = query_light_direct.single_mut();
 
         ui.horizontal(|ui| {
             ui.radio_value(&mut light_power.current_light, LightType::Point, "Point");
@@ -331,7 +329,7 @@ fn ui_camera(
                 CameraType::FirstPerson => {
                     ui.label("Distance");
                     ui.add(
-                        egui::Slider::new(&mut transform.translation.z, -HEAD_SIZE_2..=HEAD_SIZE_2)
+                        egui::Slider::new(&mut transform.translation.z, -HEAD_SIZE..=HEAD_SIZE)
                             .step_by(0.05),
                     );
                 }

@@ -26,7 +26,8 @@ pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap()))
+        app.insert_resource(Msaa::default())
+            .insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap()))
             .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
             // .add_plugin(RapierDebugRenderPlugin::default())
             .add_plugin(PlayerPlugin)
