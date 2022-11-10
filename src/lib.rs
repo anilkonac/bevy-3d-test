@@ -1,5 +1,3 @@
-use std::f32::consts::PI;
-
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
@@ -16,6 +14,8 @@ const HALF_SIZE_GROUND: f32 = 7.5;
 const HALF_SIZE_CUBE: f32 = 0.5;
 
 const SHADOW_PROJECTION_SIZE: f32 = HALF_SIZE_GROUND * 1.42/*~=2.0.sqrt()*/;
+
+const TRANSLATION_LIGHT_POINT_SPOT: Vec3 = Vec3::new(-2.0, 2.5, 1.0);
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 enum AppState {
@@ -73,9 +73,10 @@ fn setup(
         ));
 
     // Create lights
-    let transform_light_point = Transform::from_xyz(-3.0, 2.5, 4.0).looking_at(Vec3::ZERO, Vec3::Y);
-    let transform_light_direct =
-        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -PI / 4.0, PI / 4.0, 0.0));
+    let transform_light_point = Transform::from_translation(TRANSLATION_LIGHT_POINT_SPOT);
+    let transform_light_spot =
+        Transform::from_translation(TRANSLATION_LIGHT_POINT_SPOT).looking_at(Vec3::ZERO, Vec3::Y);
+    let transform_light_direct = Transform::from_rotation(transform_light_spot.rotation);
 
     commands.spawn_bundle(DirectionalLightBundle {
         transform: transform_light_direct,
@@ -98,6 +99,16 @@ fn setup(
     commands.spawn_bundle(PointLightBundle {
         transform: transform_light_point,
         point_light: PointLight {
+            shadows_enabled: true,
+            intensity: 0.0,
+            ..default()
+        },
+        ..default()
+    });
+
+    commands.spawn_bundle(SpotLightBundle {
+        transform: transform_light_spot,
+        spot_light: SpotLight {
             shadows_enabled: true,
             intensity: 0.0,
             ..default()
