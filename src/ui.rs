@@ -223,7 +223,10 @@ fn ui_graphics(
             LightType::Directional => {
                 light_point.intensity = 0.0;
                 let mut color = light_direct.color.as_rgba_f32();
-                ui.color_edit_button_rgba_unmultiplied(&mut color);
+                ui.horizontal(|ui| {
+                    ui.label("Color");
+                    ui.color_edit_button_rgba_unmultiplied(&mut color);
+                });
                 light_direct.color = Color::from(color);
                 show_shadow_projection = true;
                 ui.add(

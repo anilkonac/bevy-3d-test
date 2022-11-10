@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
@@ -13,7 +15,7 @@ const COLOR_GROUND: &str = "586A6A"; // Deep Space Sparkle
 const HALF_SIZE_GROUND: f32 = 7.5;
 const HALF_SIZE_CUBE: f32 = 0.5;
 
-const SHADOW_PROJECTION_SIZE: f32 = 20.0;
+const SHADOW_PROJECTION_SIZE: f32 = HALF_SIZE_GROUND * 1.42/*~=2.0.sqrt()*/;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 enum AppState {
@@ -71,10 +73,12 @@ fn setup(
         ));
 
     // Create lights
-    let transform_lights = Transform::from_xyz(-3.0, 5.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y);
+    let transform_light_point = Transform::from_xyz(-3.0, 2.5, 4.0).looking_at(Vec3::ZERO, Vec3::Y);
+    let transform_light_direct =
+        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -PI / 4.0, PI / 4.0, 0.0));
 
     commands.spawn_bundle(DirectionalLightBundle {
-        transform: transform_lights,
+        transform: transform_light_direct,
         directional_light: DirectionalLight {
             shadows_enabled: true,
             shadow_projection: OrthographicProjection {
@@ -92,7 +96,7 @@ fn setup(
     });
 
     commands.spawn_bundle(PointLightBundle {
-        transform: transform_lights,
+        transform: transform_light_point,
         point_light: PointLight {
             shadows_enabled: true,
             intensity: 0.0,
