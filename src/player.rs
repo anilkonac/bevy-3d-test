@@ -66,14 +66,16 @@ fn setup_player(
         Transform::from_translation(CAMERA_TPS_POS_RELATIVE).looking_at(Vec3::ZERO, Vec3::Y);
 
     let player = commands
-        .spawn_bundle(SpatialBundle {
-            transform: transform_player,
-            ..default()
-        })
-        .insert(Player)
-        .insert(Rotator)
+        .spawn((
+            SpatialBundle {
+                transform: transform_player,
+                ..default()
+            },
+            Player,
+            Rotator,
+        ))
         .with_children(|parent| {
-            parent.spawn_bundle(PbrBundle {
+            parent.spawn(PbrBundle {
                 transform: Transform::from_xyz(0.0, TORSO_ALT_RELATIVE, 0.0),
                 mesh: meshes.add(Mesh::from(shape::Box::new(
                     TORSO_WIDTH,
@@ -87,16 +89,18 @@ fn setup_player(
         .id();
 
     let head = commands
-        .spawn_bundle(PbrBundle {
-            transform: transform_head,
-            mesh: meshes.add(Mesh::from(shape::Cube::new(HEAD_SIZE))),
-            material: materials.add(Color::hex(COLOR_PLAYER_HEAD).unwrap().into()),
-            ..default()
-        })
-        .insert(HeadState::default())
-        .insert(Rotator)
+        .spawn((
+            PbrBundle {
+                transform: transform_head,
+                mesh: meshes.add(Mesh::from(shape::Cube::new(HEAD_SIZE))),
+                material: materials.add(Color::hex(COLOR_PLAYER_HEAD).unwrap().into()),
+                ..default()
+            },
+            HeadState::default(),
+            Rotator,
+        ))
         .with_children(|parent| {
-            parent.spawn_bundle(Camera3dBundle {
+            parent.spawn(Camera3dBundle {
                 transform: Transform::from_translation(CAMERA_FPS_POS_RELATIVE),
                 camera: Camera {
                     is_active: false,
@@ -108,7 +112,7 @@ fn setup_player(
         .id();
 
     let third_person_cam = commands
-        .spawn_bundle(Camera3dBundle {
+        .spawn(Camera3dBundle {
             transform: transform_third_person_cam,
             ..default()
         })
