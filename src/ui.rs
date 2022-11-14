@@ -1,6 +1,6 @@
 use bevy::{
     pbr::{DirectionalLightShadowMap, PointLightShadowMap},
-    {prelude::*, window::close_when_requested},
+    {prelude::*, window::close_when_requested, window::CursorGrabMode},
 };
 use bevy_egui::{
     egui::{self, Ui},
@@ -89,12 +89,12 @@ fn grab_mouse(
         match app_state.current() {
             AppState::InGame => {
                 window.set_cursor_visibility(true);
-                window.set_cursor_lock_mode(false);
+                window.set_cursor_grab_mode(CursorGrabMode::None);
                 app_state.set(AppState::Menu).unwrap();
             }
             AppState::Menu => {
                 window.set_cursor_visibility(false);
-                window.set_cursor_lock_mode(true);
+                window.set_cursor_grab_mode(CursorGrabMode::Locked);
                 app_state.set(AppState::InGame).unwrap();
             }
             _ => (),
@@ -104,7 +104,7 @@ fn grab_mouse(
     if mouse.just_pressed(MouseButton::Left) && (*app_state.current() == AppState::Start) {
         let window = windows.get_primary_mut().unwrap();
         window.set_cursor_visibility(false);
-        window.set_cursor_lock_mode(true);
+        window.set_cursor_grab_mode(CursorGrabMode::Locked);
         app_state.set(AppState::InGame).unwrap();
     }
 }
