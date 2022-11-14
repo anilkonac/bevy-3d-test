@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
+// use bevy_rapier3d::prelude::*;
 
 mod player;
 mod ui;
@@ -30,7 +30,7 @@ impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Msaa::default())
             .insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap()))
-            .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+            // .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
             // .add_plugin(RapierDebugRenderPlugin::default())
             .add_plugin(PlayerPlugin)
             .add_plugin(UIPlugin)
@@ -53,7 +53,8 @@ fn setup(
             material: materials.add(Color::hex(COLOR_GROUND).unwrap().into()),
             ..default()
         })
-        .insert(Collider::cuboid(HALF_SIZE_GROUND, 0.0, HALF_SIZE_GROUND));
+        // .insert(Collider::cuboid(HALF_SIZE_GROUND, 0.0, HALF_SIZE_GROUND))
+        ;
 
     // Create cube
     commands
@@ -65,12 +66,13 @@ fn setup(
             transform: Transform::from_xyz(0.0, 3.0, 0.0),
             ..default()
         })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::cuboid(
-            HALF_SIZE_CUBE,
-            HALF_SIZE_CUBE,
-            HALF_SIZE_CUBE,
-        ));
+        // .insert(RigidBody::Dynamic)
+        // .insert(Collider::cuboid(
+        //     HALF_SIZE_CUBE,
+        //     HALF_SIZE_CUBE,
+        //     HALF_SIZE_CUBE,
+        // ));
+        ;
 
     // Create lights
     let transform_light_point = Transform::from_translation(TRANSLATION_LIGHT_POINT_SPOT);

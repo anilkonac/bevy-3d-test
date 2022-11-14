@@ -25,7 +25,7 @@ enum CameraType {
     ThirdPerson,
 }
 
-// Resources
+#[derive(Resource)]
 struct LightSettings {
     light_direct_illuminance: f32,
     light_point_intensity: f32,
@@ -44,6 +44,7 @@ impl Default for LightSettings {
     }
 }
 
+#[derive(Resource)]
 struct CameraSettings {
     c_type: CameraType,
     distance: f32,
