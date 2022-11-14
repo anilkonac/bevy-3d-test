@@ -17,3 +17,4 @@ opt-level = 3
 bevy = {version = "0.9.0", features = ["dynamic"] } # https://bevyengine.org/learn/book/getting-started/setup/#enable-fast-compiles-optional
 bevy_egui = "0.17.1"
 # bevy_rapier3d = "0.18.0"
+bevy_rapier3d = {git = "https://github.com/devil-ira/bevy_rapier", branch = "bevy-0.9"}

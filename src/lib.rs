@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-// use bevy_rapier3d::prelude::*;
+use bevy_rapier3d::prelude::*;
 
 mod player;
 mod ui;
@@ -30,7 +30,7 @@ impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Msaa::default())
             .insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap()))
-            // .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+            .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
             // .add_plugin(RapierDebugRenderPlugin::default())
             .add_plugin(PlayerPlugin)
             .add_plugin(UIPlugin)
@@ -45,34 +45,30 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Create ground plane
-    commands
-        .spawn(PbrBundle {
+    commands.spawn((
+        PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Plane {
                 size: HALF_SIZE_GROUND * 2.0,
             })),
             material: materials.add(Color::hex(COLOR_GROUND).unwrap().into()),
             ..default()
-        })
-        // .insert(Collider::cuboid(HALF_SIZE_GROUND, 0.0, HALF_SIZE_GROUND))
-        ;
+        },
+        Collider::cuboid(HALF_SIZE_GROUND, 0.0, HALF_SIZE_GROUND),
+    ));
 
     // Create cube
-    commands
-        .spawn(PbrBundle {
+    commands.spawn((
+        PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Cube {
                 size: HALF_SIZE_CUBE * 2.0,
             })),
             material: materials.add(Color::hex(COLOR_CUBE).unwrap().into()),
             transform: Transform::from_xyz(0.0, 3.0, 0.0),
             ..default()
-        })
-        // .insert(RigidBody::Dynamic)
-        // .insert(Collider::cuboid(
-        //     HALF_SIZE_CUBE,
-        //     HALF_SIZE_CUBE,
-        //     HALF_SIZE_CUBE,
-        // ));
-        ;
+        },
+        RigidBody::Dynamic,
+        Collider::cuboid(HALF_SIZE_CUBE, HALF_SIZE_CUBE, HALF_SIZE_CUBE),
+    ));
 
     // Create lights
     let transform_light_point = Transform::from_translation(TRANSLATION_LIGHT_POINT_SPOT);
