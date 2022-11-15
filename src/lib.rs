@@ -45,32 +45,30 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Create ground plane
-    commands
-        .spawn_bundle(PbrBundle {
+    commands.spawn((
+        PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Plane {
                 size: HALF_SIZE_GROUND * 2.0,
             })),
             material: materials.add(Color::hex(COLOR_GROUND).unwrap().into()),
             ..default()
-        })
-        .insert(Collider::cuboid(HALF_SIZE_GROUND, 0.0, HALF_SIZE_GROUND));
+        },
+        Collider::cuboid(HALF_SIZE_GROUND, 0.0, HALF_SIZE_GROUND),
+    ));
 
     // Create cube
-    commands
-        .spawn_bundle(PbrBundle {
+    commands.spawn((
+        PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Cube {
                 size: HALF_SIZE_CUBE * 2.0,
             })),
             material: materials.add(Color::hex(COLOR_CUBE).unwrap().into()),
             transform: Transform::from_xyz(0.0, 3.0, 0.0),
             ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::cuboid(
-            HALF_SIZE_CUBE,
-            HALF_SIZE_CUBE,
-            HALF_SIZE_CUBE,
-        ));
+        },
+        RigidBody::Dynamic,
+        Collider::cuboid(HALF_SIZE_CUBE, HALF_SIZE_CUBE, HALF_SIZE_CUBE),
+    ));
 
     // Create lights
     let transform_light_point = Transform::from_translation(TRANSLATION_LIGHT_POINT_SPOT);
@@ -78,7 +76,7 @@ fn setup(
         Transform::from_translation(TRANSLATION_LIGHT_POINT_SPOT).looking_at(Vec3::ZERO, Vec3::Y);
     let transform_light_direct = Transform::from_rotation(transform_light_spot.rotation);
 
-    commands.spawn_bundle(DirectionalLightBundle {
+    commands.spawn(DirectionalLightBundle {
         transform: transform_light_direct,
         directional_light: DirectionalLight {
             shadows_enabled: true,
@@ -96,7 +94,7 @@ fn setup(
         ..default()
     });
 
-    commands.spawn_bundle(PointLightBundle {
+    commands.spawn(PointLightBundle {
         transform: transform_light_point,
         point_light: PointLight {
             shadows_enabled: true,
@@ -106,7 +104,7 @@ fn setup(
         ..default()
     });
 
-    commands.spawn_bundle(SpotLightBundle {
+    commands.spawn(SpotLightBundle {
         transform: transform_light_spot,
         spot_light: SpotLight {
             shadows_enabled: true,
