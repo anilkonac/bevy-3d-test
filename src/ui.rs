@@ -94,8 +94,12 @@ fn grab_mouse(
             }
             AppState::Menu => {
                 window.set_cursor_visibility(false);
-                window.set_cursor_grab_mode(CursorGrabMode::Confined);
                 app_state.set(AppState::InGame).unwrap();
+                if cfg!(target_os = "macos") {
+                    window.set_cursor_grab_mode(CursorGrabMode::Locked);
+                    return;
+                }
+                window.set_cursor_grab_mode(CursorGrabMode::Confined);
             }
             _ => (),
         }
@@ -104,8 +108,12 @@ fn grab_mouse(
     if mouse.just_pressed(MouseButton::Left) && (*app_state.current() == AppState::Start) {
         let window = windows.get_primary_mut().unwrap();
         window.set_cursor_visibility(false);
-        window.set_cursor_grab_mode(CursorGrabMode::Confined);
         app_state.set(AppState::InGame).unwrap();
+        if cfg!(target_os = "macos") {
+            window.set_cursor_grab_mode(CursorGrabMode::Locked);
+            return;
+        }
+        window.set_cursor_grab_mode(CursorGrabMode::Confined);
     }
 }
 
