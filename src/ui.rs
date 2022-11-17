@@ -95,7 +95,7 @@ fn grab_mouse(
             AppState::Menu => {
                 window.set_cursor_visibility(false);
                 app_state.set(AppState::InGame).unwrap();
-                if cfg!(target_os = "macos") {
+                if cfg!(target_os = "macos") || cfg!(target_arch = "wasm32") {
                     window.set_cursor_grab_mode(CursorGrabMode::Locked);
                     return;
                 }
@@ -109,7 +109,7 @@ fn grab_mouse(
         let window = windows.get_primary_mut().unwrap();
         window.set_cursor_visibility(false);
         app_state.set(AppState::InGame).unwrap();
-        if cfg!(target_os = "macos") {
+        if cfg!(target_os = "macos") || cfg!(target_arch = "wasm32") {
             window.set_cursor_grab_mode(CursorGrabMode::Locked);
             return;
         }
