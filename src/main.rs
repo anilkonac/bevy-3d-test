@@ -13,11 +13,13 @@ fn main() {
     console_error_panic_hook::set_once();
 
     App::new()
-        // .insert_resource(WindowDescriptor {
-        //     present_mode: PresentMode::AutoNoVsync,
-        //     ..default()
-        // })
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            // window: WindowDescriptor {
+            //     present_mode: PresentMode::AutoNoVsync,
+            //     ..default()
+            // },
+            ..default()
+        }))
         .add_plugin(GamePlugin)
         // .add_plugin(LogDiagnosticsPlugin::default())
         // .add_plugin(FrameTimeDiagnosticsPlugin::default())

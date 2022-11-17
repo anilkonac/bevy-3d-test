@@ -1,6 +1,6 @@
 use bevy::{
     pbr::{DirectionalLightShadowMap, PointLightShadowMap},
-    {prelude::*, window::close_when_requested},
+    {prelude::*, window::close_when_requested, window::CursorGrabMode},
 };
 use bevy_egui::{
     egui::{self, Ui},
@@ -25,7 +25,7 @@ enum CameraType {
     ThirdPerson,
 }
 
-// Resources
+#[derive(Resource)]
 struct LightSettings {
     light_direct_illuminance: f32,
     light_point_intensity: f32,
@@ -44,6 +44,7 @@ impl Default for LightSettings {
     }
 }
 
+#[derive(Resource)]
 struct CameraSettings {
     c_type: CameraType,
     distance: f32,
@@ -88,13 +89,17 @@ fn grab_mouse(
         match app_state.current() {
             AppState::InGame => {
                 window.set_cursor_visibility(true);
-                window.set_cursor_lock_mode(false);
+                window.set_cursor_grab_mode(CursorGrabMode::None);
                 app_state.set(AppState::Menu).unwrap();
             }
             AppState::Menu => {
                 window.set_cursor_visibility(false);
-                window.set_cursor_lock_mode(true);
                 app_state.set(AppState::InGame).unwrap();
+                if cfg!(target_os = "macos") || cfg!(target_arch = "wasm32") {
+                    window.set_cursor_grab_mode(CursorGrabMode::Locked);
+                    return;
+                }
+                window.set_cursor_grab_mode(CursorGrabMode::Confined);
             }
             _ => (),
         }
@@ -103,8 +108,12 @@ fn grab_mouse(
     if mouse.just_pressed(MouseButton::Left) && (*app_state.current() == AppState::Start) {
         let window = windows.get_primary_mut().unwrap();
         window.set_cursor_visibility(false);
-        window.set_cursor_lock_mode(true);
         app_state.set(AppState::InGame).unwrap();
+        if cfg!(target_os = "macos") || cfg!(target_arch = "wasm32") {
+            window.set_cursor_grab_mode(CursorGrabMode::Locked);
+            return;
+        }
+        window.set_cursor_grab_mode(CursorGrabMode::Confined);
     }
 }
 
