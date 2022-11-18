@@ -72,12 +72,12 @@ impl Plugin for UIPlugin {
                     .with_system(ui_graphics.before(ui_camera))
                     .with_system(ui_camera.before(close_when_requested)),
             )
-            .add_system(grab_mouse.label("grab_mouse").before(ui_info))
+            .add_system(grab_mouse_system.label("grab_mouse").before(ui_info))
             .add_system(switch_camera.before(ui_camera));
     }
 }
 
-fn grab_mouse(
+fn grab_mouse_system(
     mut windows: ResMut<Windows>,
     mut app_state: ResMut<State<AppState>>,
     key: Res<Input<KeyCode>>,
@@ -95,11 +95,7 @@ fn grab_mouse(
             AppState::Menu => {
                 window.set_cursor_visibility(false);
                 app_state.set(AppState::InGame).unwrap();
-                if cfg!(target_os = "macos") || cfg!(target_arch = "wasm32") {
-                    window.set_cursor_grab_mode(CursorGrabMode::Locked);
-                    return;
-                }
-                window.set_cursor_grab_mode(CursorGrabMode::Confined);
+                grab_mouse(window);
             }
             _ => (),
         }
@@ -109,12 +105,18 @@ fn grab_mouse(
         let window = windows.get_primary_mut().unwrap();
         window.set_cursor_visibility(false);
         app_state.set(AppState::InGame).unwrap();
-        if cfg!(target_os = "macos") || cfg!(target_arch = "wasm32") {
-            window.set_cursor_grab_mode(CursorGrabMode::Locked);
-            return;
-        }
-        window.set_cursor_grab_mode(CursorGrabMode::Confined);
+        grab_mouse(window);
     }
+}
+
+#[cfg(any(target_os = "macos", target_arch = "wasm32"))]
+fn grab_mouse(window: &mut Window) {
+    window.set_cursor_grab_mode(CursorGrabMode::Locked);
+}
+
+#[cfg(not(any(target_os = "macos", target_arch = "wasm32")))]
+fn grab_mouse(window: &mut Window) {
+    window.set_cursor_grab_mode(CursorGrabMode::Confined);
 }
 
 fn ui_info(mut egui_context: ResMut<EguiContext>, app_state: Res<State<AppState>>) {
