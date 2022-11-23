@@ -4,7 +4,7 @@ use bevy::{
 };
 use bevy_egui::{
     egui::{self, Ui},
-    EguiContext, EguiPlugin,
+    EguiContext,
 };
 
 use crate::{
@@ -65,11 +65,11 @@ impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(LightSettings::default())
             .insert_resource(CameraSettings::default())
-            .add_plugin(EguiPlugin)
+            // .add_plugin(EguiPlugin)
             .add_system(ui_info.before(ui_graphics))
             .add_system_set(
                 SystemSet::on_update(AppState::Menu)
-                    .with_system(ui_graphics.before(ui_camera))
+                    // .with_system(ui_graphics.before(ui_camera))
                     .with_system(ui_camera.before(close_when_requested)),
             )
             .add_system(grab_mouse_system.label("grab_mouse").before(ui_info))
