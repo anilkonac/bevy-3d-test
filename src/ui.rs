@@ -1,36 +1,19 @@
-use bevy::{
-    pbr::{DirectionalLightShadowMap, PointLightShadowMap},
-    {prelude::*, window::close_when_requested, window::CursorGrabMode},
-};
+use bevy::{prelude::*, window::close_when_requested, window::CursorGrabMode};
+
 use bevy_egui::{
     egui::{self, Ui},
-    EguiContext,
+    EguiContext, EguiPlugin,
 };
 
 use crate::{
     player::{CAMERA_TPS_POS_RELATIVE, HEAD_SIZE},
-    AppState,
+    AppState, PointLightSettings,
 };
 
 #[derive(PartialEq, Clone, Copy)]
 enum CameraType {
     FirstPerson,
     ThirdPerson,
-}
-
-#[derive(Resource)]
-struct PointLightSettings {
-    intensity: f32,
-    color: [f32; 4],
-}
-
-impl Default for PointLightSettings {
-    fn default() -> Self {
-        PointLightSettings {
-            intensity: 1256.64, // TODO: Get this value from the map file
-            color: [1.0, 0.242, 0.0, 1.0],
-        }
-    }
 }
 
 #[derive(Resource)]
@@ -52,8 +35,10 @@ pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(CameraSettings::default())
-            .insert_resource(PointLightSettings::default())
+        app
+            // .add_plugin(InspectorPlugin::<InspectorQuery<&mut PointLight>>::new())
+            .add_plugin(EguiPlugin)
+            .insert_resource(CameraSettings::default())
             .add_system(ui_info.before(ui_graphics))
             .add_system_set(
                 SystemSet::on_update(AppState::Menu)
@@ -149,7 +134,6 @@ fn switch_camera(
 
 fn ui_graphics(
     mut egui_context: ResMut<EguiContext>,
-    mut shadow_map_point: ResMut<PointLightShadowMap>,
     mut query_light_point: Query<&mut PointLight>,
     mut clear_color: ResMut<ClearColor>,
     mut ambient_light: ResMut<AmbientLight>,
@@ -196,10 +180,14 @@ fn ui_graphics(
                 ))
                 .changed();
         });
+        changed |= ui
+            .checkbox(&mut point_light_settings.shadows_enabled, "Shadows")
+            .changed();
         if changed {
             for mut point_light in query_light_point.iter_mut() {
                 point_light.color = Color::from(point_light_settings.color);
                 point_light.intensity = point_light_settings.intensity;
+                point_light.shadows_enabled = point_light_settings.shadows_enabled;
             }
         }
     };

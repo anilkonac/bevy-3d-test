@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 
 mod player;
@@ -16,19 +15,28 @@ enum AppState {
     Menu,
 }
 
+#[derive(Resource, Default)]
+pub struct PointLightSettings {
+    pub intensity: f32,
+    pub color: [f32; 4],
+    pub initialized: bool,
+    pub shadows_enabled: bool,
+}
+
 pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Msaa::default())
             .insert_resource(ClearColor(COLOR_BACKGROUND))
-            .add_plugin(WorldInspectorPlugin::new())
+            .insert_resource(PointLightSettings::default())
             .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
             // .add_plugin(RapierDebugRenderPlugin::default())
             .add_plugin(PlayerPlugin)
             .add_plugin(UIPlugin)
             .add_state(AppState::Start)
-            .add_startup_system(setup.label("main_setup"));
+            .add_startup_system(setup.label("main_setup"))
+            .add_system_set(SystemSet::on_update(AppState::Start).with_system(setup_lights));
     }
 }
 
@@ -40,9 +48,28 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     });
 
     commands.insert_resource(AmbientLight {
-        color: COLOR_BACKGROUND,
-        brightness: 0.0,
+        brightness: 0.1,
+        ..default()
     });
 }
 
-// fn setup_lights(mut commands, Query<Transform>)
+fn setup_lights(
+    mut point_lights: Query<&mut PointLight>,
+    mut settings: ResMut<PointLightSettings>,
+    mut ambient_light: ResMut<AmbientLight>,
+) {
+    if settings.initialized {
+        return;
+    }
+
+    for mut light in point_lights.iter_mut() {
+        if !settings.initialized {
+            settings.intensity = light.intensity;
+            settings.color = light.color.as_rgba_f32();
+            settings.initialized = true;
+            settings.shadows_enabled = true;
+            ambient_light.color = light.color;
+        }
+        light.shadows_enabled = true;
+    }
+}
