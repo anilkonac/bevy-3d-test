@@ -7,7 +7,7 @@ mod ui;
 use player::PlayerPlugin;
 use ui::UIPlugin;
 
-const COLOR_BACKGROUND: &str = "87CEEB"; // Sky Blue
+const COLOR_BACKGROUND: Color = Color::rgb(0.008, 0.008, 0.011);
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 enum AppState {
@@ -21,7 +21,7 @@ pub struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Msaa::default())
-            .insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap()))
+            .insert_resource(ClearColor(COLOR_BACKGROUND))
             .add_plugin(WorldInspectorPlugin::new())
             .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
             // .add_plugin(RapierDebugRenderPlugin::default())
@@ -40,8 +40,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     });
 
     commands.insert_resource(AmbientLight {
-        color: Color::hex(COLOR_BACKGROUND).unwrap(),
-        brightness: 0.9,
+        color: COLOR_BACKGROUND,
+        brightness: 0.0,
     });
 }
 
