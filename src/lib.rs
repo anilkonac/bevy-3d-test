@@ -6,7 +6,7 @@ mod ui;
 use player::PlayerPlugin;
 use ui::UIPlugin;
 
-const COLOR_BACKGROUND: Color = Color::rgb(0.008, 0.008, 0.011);
+const COLOR_BACKGROUND: Color = Color::rgb_linear(0.008, 0.008, 0.011);
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 enum AppState {
@@ -65,7 +65,7 @@ fn setup_lights(
     for mut light in point_lights.iter_mut() {
         if !settings.initialized {
             settings.intensity = light.intensity;
-            settings.color = light.color.as_rgba_f32();
+            settings.color = light.color.as_linear_rgba_f32();
             settings.initialized = true;
             settings.shadows_enabled = true;
             ambient_light.color = light.color;
