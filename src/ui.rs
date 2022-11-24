@@ -1,9 +1,13 @@
-use bevy::{prelude::*, window::close_when_requested, window::CursorGrabMode};
+use bevy::{
+    core_pipeline::bloom::BloomSettings, prelude::*, window::close_when_requested,
+    window::CursorGrabMode,
+};
 
 use bevy_egui::{
     egui::{self, Ui},
     EguiContext, EguiPlugin,
 };
+// use bevy_inspector_egui::{widgets::InspectorQuery, InspectorPlugin};
 
 use crate::{
     player::{CAMERA_TPS_POS_RELATIVE, HEAD_SIZE},
@@ -20,6 +24,7 @@ enum CameraType {
 struct CameraSettings {
     c_type: CameraType,
     distance: f32,
+    bloom: BloomSettings,
 }
 
 impl Default for CameraSettings {
@@ -27,6 +32,7 @@ impl Default for CameraSettings {
         CameraSettings {
             c_type: CameraType::ThirdPerson,
             distance: CAMERA_TPS_POS_RELATIVE.distance(Vec3::ZERO),
+            bloom: BloomSettings::default(),
         }
     }
 }
@@ -215,6 +221,7 @@ fn ui_camera(
     mut egui_context: ResMut<EguiContext>,
     mut cam_settings: ResMut<CameraSettings>,
     mut query_cams: Query<(&mut Camera, &mut Transform), With<Camera>>,
+    mut query_bloom: Query<&mut BloomSettings>,
 ) {
     let contents = |ui: &mut Ui| {
         ui.horizontal(|ui| {
@@ -307,6 +314,40 @@ fn ui_camera(
                     *transform =
                         Transform::from_translation(*translation).looking_at(Vec3::ZERO, Vec3::Y);
                 }
+            }
+        }
+        ui.separator();
+
+        let mut changed = false;
+        ui.label("Bloom");
+        ui.horizontal(|ui| {
+            ui.label("Threshold");
+            changed |= ui
+                .add(egui::DragValue::new(&mut cam_settings.bloom.threshold).speed(0.01))
+                .changed();
+        });
+        ui.horizontal(|ui| {
+            ui.label("Knee");
+            changed |= ui
+                .add(egui::DragValue::new(&mut cam_settings.bloom.knee).speed(0.01))
+                .changed();
+        });
+        ui.horizontal(|ui| {
+            ui.label("Scale");
+            changed |= ui
+                .add(egui::DragValue::new(&mut cam_settings.bloom.scale).speed(0.01))
+                .changed();
+        });
+        ui.horizontal(|ui| {
+            ui.label("Intensity");
+            changed |= ui
+                .add(egui::DragValue::new(&mut cam_settings.bloom.intensity).speed(0.01))
+                .changed();
+        });
+
+        if changed {
+            for mut bloom in query_bloom.iter_mut() {
+                *bloom = cam_settings.bloom.clone();
             }
         }
     };

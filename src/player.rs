@@ -1,4 +1,7 @@
-use bevy::{input::mouse::MouseMotion, prelude::*, window::close_when_requested};
+use bevy::{
+    core_pipeline::bloom::BloomSettings, input::mouse::MouseMotion, prelude::*,
+    window::close_when_requested,
+};
 use std::f32::consts::FRAC_PI_2;
 
 use crate::AppState;
@@ -100,22 +103,33 @@ fn setup_player(
             Rotator,
         ))
         .with_children(|parent| {
-            parent.spawn(Camera3dBundle {
-                transform: Transform::from_translation(CAMERA_FPS_POS_RELATIVE),
-                camera: Camera {
-                    is_active: false,
+            parent.spawn((
+                Camera3dBundle {
+                    transform: Transform::from_translation(CAMERA_FPS_POS_RELATIVE),
+                    camera: Camera {
+                        is_active: false,
+                        hdr: true,
+                        ..default()
+                    },
                     ..default()
                 },
-                ..default()
-            });
+                BloomSettings::default(),
+            ));
         })
         .id();
 
     let third_person_cam = commands
-        .spawn(Camera3dBundle {
-            transform: transform_third_person_cam,
-            ..default()
-        })
+        .spawn((
+            Camera3dBundle {
+                transform: transform_third_person_cam,
+                camera: Camera {
+                    hdr: true,
+                    ..default()
+                },
+                ..default()
+            },
+            BloomSettings::default(),
+        ))
         .id();
 
     commands.entity(head).push_children(&[third_person_cam]);
