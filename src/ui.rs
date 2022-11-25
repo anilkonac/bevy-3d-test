@@ -146,22 +146,23 @@ fn ui_graphics(
     mut point_light_settings: ResMut<PointLightSettings>,
 ) {
     let contents = |ui: &mut Ui| {
-        let mut color_rgba_clear = clear_color.as_linear_rgba_f32();
-        let mut color_rgba_ambient = ambient_light.color.as_linear_rgba_f32();
+        let mut color_lrgba_clear = clear_color.as_linear_rgba_f32();
+        let mut color_lrgba_ambient = ambient_light.color.as_linear_rgba_f32();
+        let mut color_lrgba_point = point_light_settings.color.as_linear_rgba_f32();
 
         ui.horizontal(|ui| {
             ui.label("Clear Color");
-            ui.color_edit_button_rgba_unmultiplied(&mut color_rgba_clear);
+            ui.color_edit_button_rgba_unmultiplied(&mut color_lrgba_clear);
             ui.label("Sync with");
             if ui.button("Ambient").clicked() {
-                color_rgba_ambient = color_rgba_clear;
+                color_lrgba_ambient = color_lrgba_clear;
             }
         });
         clear_color.0 = Color::rgba_linear(
-            color_rgba_clear[0],
-            color_rgba_clear[1],
-            color_rgba_clear[2],
-            color_rgba_clear[3],
+            color_lrgba_clear[0],
+            color_lrgba_clear[1],
+            color_lrgba_clear[2],
+            color_lrgba_clear[3],
         );
 
         ui.separator();
@@ -169,15 +170,15 @@ fn ui_graphics(
         ui.label("Ambient Light ");
         ui.horizontal(|ui| {
             ui.label("Color");
-            ui.color_edit_button_rgba_unmultiplied(&mut color_rgba_ambient);
+            ui.color_edit_button_rgba_unmultiplied(&mut color_lrgba_ambient);
             ui.label("Brightness");
             ui.add(egui::Slider::new(&mut ambient_light.brightness, 0.0..=1.0).step_by(0.01));
         });
         ambient_light.color = Color::rgba_linear(
-            color_rgba_ambient[0],
-            color_rgba_ambient[1],
-            color_rgba_ambient[2],
-            color_rgba_ambient[3],
+            color_lrgba_ambient[0],
+            color_lrgba_ambient[1],
+            color_lrgba_ambient[2],
+            color_lrgba_ambient[3],
         );
 
         ui.separator();
@@ -186,7 +187,7 @@ fn ui_graphics(
         ui.horizontal(|ui| {
             ui.label("Color");
             changed |= ui
-                .color_edit_button_rgba_unmultiplied(&mut point_light_settings.color)
+                .color_edit_button_rgba_unmultiplied(&mut color_lrgba_point)
                 .changed();
             ui.label("Intensity");
             changed |= ui
@@ -200,14 +201,14 @@ fn ui_graphics(
             .checkbox(&mut point_light_settings.shadows_enabled, "Shadows")
             .changed();
         if changed {
-            let color_point = &point_light_settings.color;
+            point_light_settings.color = Color::rgba_linear(
+                color_lrgba_point[0],
+                color_lrgba_point[1],
+                color_lrgba_point[2],
+                color_lrgba_point[3],
+            );
             for mut point_light in query_light_point.iter_mut() {
-                point_light.color = Color::rgba_linear(
-                    color_point[0],
-                    color_point[1],
-                    color_point[2],
-                    color_point[3],
-                );
+                point_light.color = point_light_settings.color;
                 point_light.intensity = point_light_settings.intensity;
                 point_light.shadows_enabled = point_light_settings.shadows_enabled;
             }

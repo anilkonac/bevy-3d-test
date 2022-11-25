@@ -18,7 +18,7 @@ enum AppState {
 #[derive(Resource, Default)]
 pub struct PointLightSettings {
     pub intensity: f32,
-    pub color: [f32; 4],
+    pub color: Color,
     pub initialized: bool,
     pub shadows_enabled: bool,
 }
@@ -65,11 +65,21 @@ fn setup_lights(
     for mut light in point_lights.iter_mut() {
         if !settings.initialized {
             settings.intensity = light.intensity;
-            settings.color = light.color.as_linear_rgba_f32();
+
+            // Treat the color coming from Blender as rgba_linear
+            let blender_color = light.color.as_rgba_f32();
+            settings.color = Color::rgba_linear(
+                blender_color[0],
+                blender_color[1],
+                blender_color[2],
+                blender_color[3],
+            );
+
             settings.initialized = true;
             settings.shadows_enabled = true;
-            ambient_light.color = light.color;
+            ambient_light.color = settings.color;
         }
         light.shadows_enabled = true;
+        light.color = settings.color;
     }
 }
