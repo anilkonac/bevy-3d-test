@@ -1,7 +1,7 @@
 use bevy::{input::mouse::MouseMotion, prelude::*, window::close_when_requested};
 use std::f32::consts::FRAC_PI_2;
 
-use crate::AppState;
+use crate::{ui::CameraSettings, AppState};
 
 const PLAYER_SPEED: f32 = 3.0;
 const PLAYER_HEIGHT: f32 = 1.8;
@@ -56,6 +56,7 @@ fn setup_player(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    cam_settings: Res<CameraSettings>,
 ) {
     let transform_player = Transform::from_translation(PLAYER_INITIAL_POS)
         .looking_at(Vec3::new(0.0, PLAYER_INITIAL_POS.y, 0.0), Vec3::Y);
@@ -100,22 +101,33 @@ fn setup_player(
             Rotator,
         ))
         .with_children(|parent| {
-            parent.spawn(Camera3dBundle {
-                transform: Transform::from_translation(CAMERA_FPS_POS_RELATIVE),
-                camera: Camera {
-                    is_active: false,
+            parent.spawn((
+                Camera3dBundle {
+                    transform: Transform::from_translation(CAMERA_FPS_POS_RELATIVE),
+                    camera: Camera {
+                        is_active: false,
+                        hdr: cam_settings.bloom_enabled,
+                        ..default()
+                    },
                     ..default()
                 },
-                ..default()
-            });
+                cam_settings.bloom.clone(),
+            ));
         })
         .id();
 
     let third_person_cam = commands
-        .spawn(Camera3dBundle {
-            transform: transform_third_person_cam,
-            ..default()
-        })
+        .spawn((
+            Camera3dBundle {
+                transform: transform_third_person_cam,
+                camera: Camera {
+                    hdr: cam_settings.bloom_enabled,
+                    ..default()
+                },
+                ..default()
+            },
+            cam_settings.bloom.clone(),
+        ))
         .id();
 
     commands.entity(head).push_children(&[third_person_cam]);

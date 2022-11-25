@@ -1,23 +1,18 @@
 use bevy::{
-    pbr::{DirectionalLightShadowMap, PointLightShadowMap},
-    {prelude::*, window::close_when_requested, window::CursorGrabMode},
+    core_pipeline::bloom::BloomSettings, prelude::*, window::close_when_requested,
+    window::CursorGrabMode,
 };
+
 use bevy_egui::{
     egui::{self, Ui},
     EguiContext, EguiPlugin,
 };
+// use bevy_inspector_egui::{widgets::InspectorQuery, InspectorPlugin, WorldInspectorPlugin};
 
 use crate::{
     player::{CAMERA_TPS_POS_RELATIVE, HEAD_SIZE},
-    AppState,
+    AppState, PointLightSettings,
 };
-
-#[derive(PartialEq)]
-enum LightType {
-    Directional,
-    Point,
-    Spot,
-}
 
 #[derive(PartialEq, Clone, Copy)]
 enum CameraType {
@@ -26,28 +21,11 @@ enum CameraType {
 }
 
 #[derive(Resource)]
-struct LightSettings {
-    light_direct_illuminance: f32,
-    light_point_intensity: f32,
-    light_spot_intensity: f32,
-    current_type: LightType,
-}
-
-impl Default for LightSettings {
-    fn default() -> Self {
-        LightSettings {
-            light_direct_illuminance: 100000.0,
-            light_point_intensity: 800.0,
-            light_spot_intensity: 800.0,
-            current_type: LightType::Directional,
-        }
-    }
-}
-
-#[derive(Resource)]
-struct CameraSettings {
+pub struct CameraSettings {
     c_type: CameraType,
     distance: f32,
+    pub bloom: BloomSettings,
+    pub bloom_enabled: bool,
 }
 
 impl Default for CameraSettings {
@@ -55,6 +33,12 @@ impl Default for CameraSettings {
         CameraSettings {
             c_type: CameraType::ThirdPerson,
             distance: CAMERA_TPS_POS_RELATIVE.distance(Vec3::ZERO),
+            bloom: BloomSettings {
+                intensity: 0.002,
+                scale: 1.40,
+                ..default()
+            },
+            bloom_enabled: true,
         }
     }
 }
@@ -63,9 +47,10 @@ pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(LightSettings::default())
+        app.add_plugin(EguiPlugin)
+            // .add_plugin(InspectorPlugin::<InspectorQuery<&mut PointLight>>::new())
+            // .add_plugin(WorldInspectorPlugin::default())
             .insert_resource(CameraSettings::default())
-            .add_plugin(EguiPlugin)
             .add_system(ui_info.before(ui_graphics))
             .add_system_set(
                 SystemSet::on_update(AppState::Menu)
@@ -161,139 +146,79 @@ fn switch_camera(
 
 fn ui_graphics(
     mut egui_context: ResMut<EguiContext>,
-    mut shadow_map_direct: ResMut<DirectionalLightShadowMap>,
-    mut shadow_map_point: ResMut<PointLightShadowMap>,
-    mut query_light_direct: Query<&mut DirectionalLight>,
     mut query_light_point: Query<&mut PointLight>,
-    mut query_light_spot: Query<&mut SpotLight>,
-    mut light_settings: ResMut<LightSettings>,
     mut clear_color: ResMut<ClearColor>,
     mut ambient_light: ResMut<AmbientLight>,
+    mut plight_settings: ResMut<PointLightSettings>,
 ) {
-    const STEP_SIZE_SHADOW_MAP: usize = 1024;
-
     let contents = |ui: &mut Ui| {
-        let mut light_direct = query_light_direct.single_mut();
-        let mut light_point = query_light_point.single_mut();
-        let mut light_spot = query_light_spot.single_mut();
-
-        let mut color_rgba_clear = clear_color.as_rgba_f32();
-        let mut color_rgba_ambient = ambient_light.color.as_rgba_f32();
+        let mut color_lrgba_clear = clear_color.as_linear_rgba_f32();
+        let mut color_lrgba_ambient = ambient_light.color.as_linear_rgba_f32();
+        let mut color_lrgba_point = plight_settings.light.color.as_linear_rgba_f32();
 
         ui.horizontal(|ui| {
             ui.label("Clear Color");
-            ui.color_edit_button_rgba_unmultiplied(&mut color_rgba_clear);
+            ui.color_edit_button_rgba_unmultiplied(&mut color_lrgba_clear);
             ui.label("Sync with");
             if ui.button("Ambient").clicked() {
-                color_rgba_ambient = color_rgba_clear;
-            }
-            if ui.button("Light").clicked() {
-                light_point.color = Color::from(color_rgba_clear);
-                light_direct.color = Color::from(color_rgba_clear);
-                light_spot.color = Color::from(color_rgba_clear);
+                color_lrgba_ambient = color_lrgba_clear;
             }
         });
-        clear_color.0 = Color::from(color_rgba_clear);
+        clear_color.0 = Color::rgba_linear(
+            color_lrgba_clear[0],
+            color_lrgba_clear[1],
+            color_lrgba_clear[2],
+            color_lrgba_clear[3],
+        );
 
         ui.separator();
 
         ui.label("Ambient Light ");
         ui.horizontal(|ui| {
             ui.label("Color");
-            ui.color_edit_button_rgba_unmultiplied(&mut color_rgba_ambient);
+            ui.color_edit_button_rgba_unmultiplied(&mut color_lrgba_ambient);
             ui.label("Brightness");
-            ui.add(egui::Slider::new(&mut ambient_light.brightness, 0.0..=1.0).step_by(0.01));
+            ui.add(egui::Slider::new(&mut ambient_light.brightness, 0.0..=5.0).step_by(0.01));
         });
-        ambient_light.color = Color::from(color_rgba_ambient);
-
-        ui.separator();
-
-        ui.end_row();
-
-        ui.horizontal(|ui| {
-            ui.radio_value(
-                &mut light_settings.current_type,
-                LightType::Directional,
-                "Directional",
-            );
-            ui.radio_value(&mut light_settings.current_type, LightType::Point, "Point");
-            ui.radio_value(&mut light_settings.current_type, LightType::Spot, "Spot");
-
-            ui.label("Light Type");
-        });
-
-        ui.end_row();
-
-        // TODO: Reduce duplicate code
-        let shadow_map_size = match light_settings.current_type {
-            LightType::Directional => {
-                // Disable other lights
-                light_point.intensity = 0.0;
-                light_spot.intensity = 0.0;
-
-                let mut color = light_direct.color.as_rgba_f32();
-                ui.horizontal(|ui| {
-                    ui.label("Color");
-                    ui.color_edit_button_rgba_unmultiplied(&mut color);
-                });
-                light_direct.color = Color::from(color);
-                ui.add(
-                    egui::Slider::new(&mut light_settings.light_direct_illuminance, 0.0..=100000.0)
-                        .text("Illuminance"),
-                );
-                light_direct.illuminance = light_settings.light_direct_illuminance;
-                &mut shadow_map_direct.size
-            }
-            LightType::Point => {
-                // Disable other lights
-                light_direct.illuminance = 0.0;
-                light_spot.intensity = 0.0;
-
-                let mut color = light_point.color.as_rgba_f32();
-                ui.horizontal(|ui| {
-                    ui.label("Color");
-                    ui.color_edit_button_rgba_unmultiplied(&mut color);
-                });
-
-                light_point.color = Color::from(color);
-                ui.add(
-                    egui::Slider::new(&mut light_settings.light_point_intensity, 0.0..=4000.0)
-                        .text("Intensity"),
-                );
-                light_point.intensity = light_settings.light_point_intensity;
-                &mut shadow_map_point.size
-            }
-            LightType::Spot => {
-                // Disable other lights
-                light_direct.illuminance = 0.0;
-                light_point.intensity = 0.0;
-
-                let mut color = light_spot.color.as_rgba_f32();
-                ui.horizontal(|ui| {
-                    ui.label("Color");
-                    ui.color_edit_button_rgba_unmultiplied(&mut color);
-                });
-                light_spot.color = Color::from(color);
-                ui.add(
-                    egui::Slider::new(&mut light_settings.light_spot_intensity, 0.0..=4000.0)
-                        .text("Intensity"),
-                );
-                light_spot.intensity = light_settings.light_spot_intensity;
-                &mut shadow_map_point.size
-            }
-        };
-
-        ui.separator();
-
-        ui.add_enabled(
-            light_settings.current_type != LightType::Spot,
-            egui::Slider::new(
-                shadow_map_size,
-                STEP_SIZE_SHADOW_MAP..=STEP_SIZE_SHADOW_MAP * 8,
-            )
-            .step_by(STEP_SIZE_SHADOW_MAP as f64)
-            .text("Shadow Map Size"),
+        ambient_light.color = Color::rgba_linear(
+            color_lrgba_ambient[0],
+            color_lrgba_ambient[1],
+            color_lrgba_ambient[2],
+            color_lrgba_ambient[3],
         );
+
+        ui.separator();
+        ui.label("Point Lights");
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Color");
+            changed |= ui
+                .color_edit_button_rgba_unmultiplied(&mut color_lrgba_point)
+                .changed();
+            ui.label("Intensity");
+            changed |= ui
+                .add(egui::Slider::new(
+                    &mut plight_settings.light.intensity,
+                    0.0..=4000.0,
+                ))
+                .changed();
+        });
+        changed |= ui
+            .checkbox(&mut plight_settings.light.shadows_enabled, "Shadows")
+            .changed();
+        if changed {
+            plight_settings.light.color = Color::rgba_linear(
+                color_lrgba_point[0],
+                color_lrgba_point[1],
+                color_lrgba_point[2],
+                color_lrgba_point[3],
+            );
+            for mut point_light in query_light_point.iter_mut() {
+                point_light.color = plight_settings.light.color;
+                point_light.intensity = plight_settings.light.intensity;
+                point_light.shadows_enabled = plight_settings.light.shadows_enabled;
+            }
+        }
     };
 
     egui::Window::new("Graphics").show(egui_context.ctx_mut(), contents);
@@ -303,6 +228,7 @@ fn ui_camera(
     mut egui_context: ResMut<EguiContext>,
     mut cam_settings: ResMut<CameraSettings>,
     mut query_cams: Query<(&mut Camera, &mut Transform), With<Camera>>,
+    mut query_bloom: Query<&mut BloomSettings>,
 ) {
     let contents = |ui: &mut Ui| {
         ui.horizontal(|ui| {
@@ -395,6 +321,45 @@ fn ui_camera(
                     *transform =
                         Transform::from_translation(*translation).looking_at(Vec3::ZERO, Vec3::Y);
                 }
+            }
+        }
+        ui.separator();
+
+        let mut changed = false;
+        changed |= ui
+            .checkbox(&mut cam_settings.bloom_enabled, "Bloom")
+            .changed();
+        ui.horizontal(|ui| {
+            ui.label("Threshold");
+            changed |= ui
+                .add(egui::DragValue::new(&mut cam_settings.bloom.threshold).speed(0.01))
+                .changed();
+        });
+        ui.horizontal(|ui| {
+            ui.label("Knee");
+            changed |= ui
+                .add(egui::DragValue::new(&mut cam_settings.bloom.knee).speed(0.01))
+                .changed();
+        });
+        ui.horizontal(|ui| {
+            ui.label("Scale");
+            changed |= ui
+                .add(egui::DragValue::new(&mut cam_settings.bloom.scale).speed(0.01))
+                .changed();
+        });
+        ui.horizontal(|ui| {
+            ui.label("Intensity");
+            changed |= ui
+                .add(egui::DragValue::new(&mut cam_settings.bloom.intensity).speed(0.0001))
+                .changed();
+        });
+
+        if changed {
+            for mut bloom in query_bloom.iter_mut() {
+                *bloom = cam_settings.bloom.clone();
+            }
+            for (mut cam, _) in query_cams.iter_mut() {
+                cam.hdr = cam_settings.bloom_enabled;
             }
         }
     };
