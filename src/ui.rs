@@ -7,7 +7,7 @@ use bevy_egui::{
     egui::{self, Ui},
     EguiContext, EguiPlugin,
 };
-// use bevy_inspector_egui::{widgets::InspectorQuery, InspectorPlugin};
+// use bevy_inspector_egui::{widgets::InspectorQuery, InspectorPlugin, WorldInspectorPlugin};
 
 use crate::{
     player::{CAMERA_TPS_POS_RELATIVE, HEAD_SIZE},
@@ -21,10 +21,11 @@ enum CameraType {
 }
 
 #[derive(Resource)]
-struct CameraSettings {
+pub struct CameraSettings {
     c_type: CameraType,
     distance: f32,
-    bloom: BloomSettings,
+    pub bloom: BloomSettings,
+    pub bloom_enabled: bool,
 }
 
 impl Default for CameraSettings {
@@ -32,7 +33,12 @@ impl Default for CameraSettings {
         CameraSettings {
             c_type: CameraType::ThirdPerson,
             distance: CAMERA_TPS_POS_RELATIVE.distance(Vec3::ZERO),
-            bloom: BloomSettings::default(),
+            bloom: BloomSettings {
+                intensity: 0.002,
+                scale: 1.40,
+                ..default()
+            },
+            bloom_enabled: true,
         }
     }
 }
@@ -41,9 +47,9 @@ pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app
+        app.add_plugin(EguiPlugin)
             // .add_plugin(InspectorPlugin::<InspectorQuery<&mut PointLight>>::new())
-            .add_plugin(EguiPlugin)
+            // .add_plugin(WorldInspectorPlugin::default())
             .insert_resource(CameraSettings::default())
             .add_system(ui_info.before(ui_graphics))
             .add_system_set(
@@ -143,12 +149,12 @@ fn ui_graphics(
     mut query_light_point: Query<&mut PointLight>,
     mut clear_color: ResMut<ClearColor>,
     mut ambient_light: ResMut<AmbientLight>,
-    mut point_light_settings: ResMut<PointLightSettings>,
+    mut plight_settings: ResMut<PointLightSettings>,
 ) {
     let contents = |ui: &mut Ui| {
         let mut color_lrgba_clear = clear_color.as_linear_rgba_f32();
         let mut color_lrgba_ambient = ambient_light.color.as_linear_rgba_f32();
-        let mut color_lrgba_point = point_light_settings.color.as_linear_rgba_f32();
+        let mut color_lrgba_point = plight_settings.light.color.as_linear_rgba_f32();
 
         ui.horizontal(|ui| {
             ui.label("Clear Color");
@@ -172,7 +178,7 @@ fn ui_graphics(
             ui.label("Color");
             ui.color_edit_button_rgba_unmultiplied(&mut color_lrgba_ambient);
             ui.label("Brightness");
-            ui.add(egui::Slider::new(&mut ambient_light.brightness, 0.0..=1.0).step_by(0.01));
+            ui.add(egui::Slider::new(&mut ambient_light.brightness, 0.0..=5.0).step_by(0.01));
         });
         ambient_light.color = Color::rgba_linear(
             color_lrgba_ambient[0],
@@ -192,25 +198,25 @@ fn ui_graphics(
             ui.label("Intensity");
             changed |= ui
                 .add(egui::Slider::new(
-                    &mut point_light_settings.intensity,
+                    &mut plight_settings.light.intensity,
                     0.0..=4000.0,
                 ))
                 .changed();
         });
         changed |= ui
-            .checkbox(&mut point_light_settings.shadows_enabled, "Shadows")
+            .checkbox(&mut plight_settings.light.shadows_enabled, "Shadows")
             .changed();
         if changed {
-            point_light_settings.color = Color::rgba_linear(
+            plight_settings.light.color = Color::rgba_linear(
                 color_lrgba_point[0],
                 color_lrgba_point[1],
                 color_lrgba_point[2],
                 color_lrgba_point[3],
             );
             for mut point_light in query_light_point.iter_mut() {
-                point_light.color = point_light_settings.color;
-                point_light.intensity = point_light_settings.intensity;
-                point_light.shadows_enabled = point_light_settings.shadows_enabled;
+                point_light.color = plight_settings.light.color;
+                point_light.intensity = plight_settings.light.intensity;
+                point_light.shadows_enabled = plight_settings.light.shadows_enabled;
             }
         }
     };
@@ -320,7 +326,9 @@ fn ui_camera(
         ui.separator();
 
         let mut changed = false;
-        ui.label("Bloom");
+        changed |= ui
+            .checkbox(&mut cam_settings.bloom_enabled, "Bloom")
+            .changed();
         ui.horizontal(|ui| {
             ui.label("Threshold");
             changed |= ui
@@ -342,13 +350,16 @@ fn ui_camera(
         ui.horizontal(|ui| {
             ui.label("Intensity");
             changed |= ui
-                .add(egui::DragValue::new(&mut cam_settings.bloom.intensity).speed(0.01))
+                .add(egui::DragValue::new(&mut cam_settings.bloom.intensity).speed(0.0001))
                 .changed();
         });
 
         if changed {
             for mut bloom in query_bloom.iter_mut() {
                 *bloom = cam_settings.bloom.clone();
+            }
+            for (mut cam, _) in query_cams.iter_mut() {
+                cam.hdr = cam_settings.bloom_enabled;
             }
         }
     };

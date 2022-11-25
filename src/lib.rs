@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
+// use bevy_rapier3d::prelude::*;
 
 mod player;
 mod ui;
@@ -15,12 +15,22 @@ enum AppState {
     Menu,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct PointLightSettings {
-    pub intensity: f32,
-    pub color: Color,
+    light: PointLight,
     pub initialized: bool,
-    pub shadows_enabled: bool,
+}
+
+impl Default for PointLightSettings {
+    fn default() -> Self {
+        PointLightSettings {
+            light: PointLight {
+                intensity: 700.0,
+                ..default()
+            },
+            initialized: false,
+        }
+    }
 }
 
 pub struct GamePlugin;
@@ -30,7 +40,7 @@ impl Plugin for GamePlugin {
         app.insert_resource(Msaa::default())
             .insert_resource(ClearColor(COLOR_BACKGROUND))
             .insert_resource(PointLightSettings::default())
-            .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+            // .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
             // .add_plugin(RapierDebugRenderPlugin::default())
             .add_plugin(PlayerPlugin)
             .add_plugin(UIPlugin)
@@ -64,11 +74,9 @@ fn setup_lights(
 
     for mut light in point_lights.iter_mut() {
         if !settings.initialized {
-            settings.intensity = light.intensity;
-
             // Treat the color coming from Blender as rgba_linear
             let blender_color = light.color.as_rgba_f32();
-            settings.color = Color::rgba_linear(
+            settings.light.color = Color::rgba_linear(
                 blender_color[0],
                 blender_color[1],
                 blender_color[2],
@@ -76,10 +84,11 @@ fn setup_lights(
             );
 
             settings.initialized = true;
-            settings.shadows_enabled = true;
-            ambient_light.color = settings.color;
+            settings.light.shadows_enabled = true;
+            ambient_light.color = settings.light.color;
         }
         light.shadows_enabled = true;
-        light.color = settings.color;
+        light.color = settings.light.color;
+        light.intensity = settings.light.intensity;
     }
 }
