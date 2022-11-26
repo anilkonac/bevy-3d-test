@@ -1,21 +1,12 @@
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
+// use bevy_rapier3d::prelude::*;
 
 mod player;
 mod ui;
 use player::PlayerPlugin;
 use ui::UIPlugin;
 
-const COLOR_BACKGROUND: &str = "87CEEB"; // Sky Blue
-const COLOR_CUBE: &str = "FE4A49"; // Tart Orange
-const COLOR_GROUND: &str = "586A6A"; // Deep Space Sparkle
-
-const HALF_SIZE_GROUND: f32 = 7.5;
-const HALF_SIZE_CUBE: f32 = 0.5;
-
-const SHADOW_PROJECTION_SIZE: f32 = HALF_SIZE_GROUND * 1.42/*~=2.0.sqrt()*/;
-
-const TRANSLATION_LIGHT_POINT_SPOT: Vec3 = Vec3::new(-2.0, 2.5, 1.0);
+const COLOR_BACKGROUND: Color = Color::rgb_linear(0.008, 0.008, 0.011);
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 enum AppState {
@@ -24,98 +15,80 @@ enum AppState {
     Menu,
 }
 
+#[derive(Resource)]
+pub struct PointLightSettings {
+    light: PointLight,
+    initialized: bool,
+}
+
+impl Default for PointLightSettings {
+    fn default() -> Self {
+        PointLightSettings {
+            light: PointLight {
+                intensity: 700.0,
+                ..default()
+            },
+            initialized: false,
+        }
+    }
+}
+
 pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Msaa::default())
-            .insert_resource(ClearColor(Color::hex(COLOR_BACKGROUND).unwrap()))
-            .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+            .insert_resource(ClearColor(COLOR_BACKGROUND))
+            .insert_resource(PointLightSettings::default())
+            // .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
             // .add_plugin(RapierDebugRenderPlugin::default())
             .add_plugin(PlayerPlugin)
             .add_plugin(UIPlugin)
             .add_state(AppState::Start)
-            .add_startup_system(setup.label("main_setup"));
+            .add_startup_system(setup.label("main_setup"))
+            .add_system_set(SystemSet::on_update(AppState::Start).with_system(setup_lights));
     }
 }
 
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    // Create ground plane
-    commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Plane {
-                size: HALF_SIZE_GROUND * 2.0,
-            })),
-            material: materials.add(Color::hex(COLOR_GROUND).unwrap().into()),
-            ..default()
-        },
-        Collider::cuboid(HALF_SIZE_GROUND, 0.0, HALF_SIZE_GROUND),
-    ));
-
-    // Create cube
-    commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube {
-                size: HALF_SIZE_CUBE * 2.0,
-            })),
-            material: materials.add(Color::hex(COLOR_CUBE).unwrap().into()),
-            transform: Transform::from_xyz(0.0, 3.0, 0.0),
-            ..default()
-        },
-        RigidBody::Dynamic,
-        Collider::cuboid(HALF_SIZE_CUBE, HALF_SIZE_CUBE, HALF_SIZE_CUBE),
-    ));
-
-    // Create lights
-    let transform_light_point = Transform::from_translation(TRANSLATION_LIGHT_POINT_SPOT);
-    let transform_light_spot =
-        Transform::from_translation(TRANSLATION_LIGHT_POINT_SPOT).looking_at(Vec3::ZERO, Vec3::Y);
-    let transform_light_direct = Transform::from_rotation(transform_light_spot.rotation);
-
-    commands.spawn(DirectionalLightBundle {
-        transform: transform_light_direct,
-        directional_light: DirectionalLight {
-            shadows_enabled: true,
-            shadow_projection: OrthographicProjection {
-                left: -SHADOW_PROJECTION_SIZE,
-                right: SHADOW_PROJECTION_SIZE,
-                bottom: -SHADOW_PROJECTION_SIZE,
-                top: SHADOW_PROJECTION_SIZE,
-                near: -SHADOW_PROJECTION_SIZE,
-                far: SHADOW_PROJECTION_SIZE,
-                ..default()
-            },
-            ..default()
-        },
-        ..default()
-    });
-
-    commands.spawn(PointLightBundle {
-        transform: transform_light_point,
-        point_light: PointLight {
-            shadows_enabled: true,
-            intensity: 0.0,
-            ..default()
-        },
-        ..default()
-    });
-
-    commands.spawn(SpotLightBundle {
-        transform: transform_light_spot,
-        spot_light: SpotLight {
-            shadows_enabled: true,
-            intensity: 0.0,
-            ..default()
-        },
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    // Dungeon
+    commands.spawn(SceneBundle {
+        scene: asset_server.load("dungeon.gltf#Scene0"),
         ..default()
     });
 
     commands.insert_resource(AmbientLight {
-        color: Color::hex(COLOR_BACKGROUND).unwrap(),
         brightness: 0.1,
-    })
+        ..default()
+    });
+}
+
+fn setup_lights(
+    mut point_lights: Query<&mut PointLight>,
+    mut settings: ResMut<PointLightSettings>,
+    mut ambient_light: ResMut<AmbientLight>,
+) {
+    if settings.initialized {
+        return;
+    }
+
+    for mut light in point_lights.iter_mut() {
+        if !settings.initialized {
+            // Treat the color coming from Blender as rgba_linear
+            let blender_color = light.color.as_rgba_f32();
+            settings.light.color = Color::rgba_linear(
+                blender_color[0],
+                blender_color[1],
+                blender_color[2],
+                blender_color[3],
+            );
+
+            settings.initialized = true;
+            settings.light.shadows_enabled = true;
+            ambient_light.color = settings.light.color;
+        }
+        light.shadows_enabled = true;
+        light.color = settings.light.color;
+        light.intensity = settings.light.intensity;
+    }
 }
