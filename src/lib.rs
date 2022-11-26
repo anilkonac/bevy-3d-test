@@ -18,7 +18,7 @@ enum AppState {
 #[derive(Resource)]
 pub struct PointLightSettings {
     light: PointLight,
-    pub initialized: bool,
+    initialized: bool,
 }
 
 impl Default for PointLightSettings {

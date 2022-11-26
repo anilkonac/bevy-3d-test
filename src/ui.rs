@@ -14,6 +14,11 @@ use crate::{
     AppState, PointLightSettings,
 };
 
+#[cfg(not(target_arch = "wasm32"))]
+const IS_DESKTOP_BUILD: bool = true;
+#[cfg(target_arch = "wasm32")]
+static IS_DESKTOP_BUILD: bool = false;
+
 #[derive(PartialEq, Clone, Copy)]
 enum CameraType {
     FirstPerson,
@@ -38,7 +43,7 @@ impl Default for CameraSettings {
                 scale: 1.40,
                 ..default()
             },
-            bloom_enabled: true,
+            bloom_enabled: IS_DESKTOP_BUILD,
         }
     }
 }
@@ -206,6 +211,11 @@ fn ui_graphics(
         changed |= ui
             .checkbox(&mut plight_settings.light.shadows_enabled, "Shadows")
             .changed();
+        if !IS_DESKTOP_BUILD {
+            ui.label(
+                "! Currently, shadows can only be enabled for one point light in WebAssembly !",
+            );
+        }
         if changed {
             plight_settings.light.color = Color::rgba_linear(
                 color_lrgba_point[0],
@@ -325,42 +335,47 @@ fn ui_camera(
         }
         ui.separator();
 
-        let mut changed = false;
-        changed |= ui
-            .checkbox(&mut cam_settings.bloom_enabled, "Bloom")
-            .changed();
-        ui.horizontal(|ui| {
-            ui.label("Threshold");
+        ui.add_enabled_ui(IS_DESKTOP_BUILD, |ui| {
+            let mut changed = false;
             changed |= ui
-                .add(egui::DragValue::new(&mut cam_settings.bloom.threshold).speed(0.01))
+                .checkbox(&mut cam_settings.bloom_enabled, "Bloom")
                 .changed();
-        });
-        ui.horizontal(|ui| {
-            ui.label("Knee");
-            changed |= ui
-                .add(egui::DragValue::new(&mut cam_settings.bloom.knee).speed(0.01))
-                .changed();
-        });
-        ui.horizontal(|ui| {
-            ui.label("Scale");
-            changed |= ui
-                .add(egui::DragValue::new(&mut cam_settings.bloom.scale).speed(0.01))
-                .changed();
-        });
-        ui.horizontal(|ui| {
-            ui.label("Intensity");
-            changed |= ui
-                .add(egui::DragValue::new(&mut cam_settings.bloom.intensity).speed(0.0001))
-                .changed();
-        });
+            ui.horizontal(|ui| {
+                ui.label("Threshold");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut cam_settings.bloom.threshold).speed(0.01))
+                    .changed();
+            });
+            ui.horizontal(|ui| {
+                ui.label("Knee");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut cam_settings.bloom.knee).speed(0.01))
+                    .changed();
+            });
+            ui.horizontal(|ui| {
+                ui.label("Scale");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut cam_settings.bloom.scale).speed(0.01))
+                    .changed();
+            });
+            ui.horizontal(|ui| {
+                ui.label("Intensity");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut cam_settings.bloom.intensity).speed(0.0001))
+                    .changed();
+            });
 
-        if changed {
-            for mut bloom in query_bloom.iter_mut() {
-                *bloom = cam_settings.bloom.clone();
+            if changed {
+                for mut bloom in query_bloom.iter_mut() {
+                    *bloom = cam_settings.bloom.clone();
+                }
+                for (mut cam, _) in query_cams.iter_mut() {
+                    cam.hdr = cam_settings.bloom_enabled;
+                }
             }
-            for (mut cam, _) in query_cams.iter_mut() {
-                cam.hdr = cam_settings.bloom_enabled;
-            }
+        });
+        if !IS_DESKTOP_BUILD {
+            ui.label("! Currently, bloom effect does not work in WebAssembly !");
         }
     };
 
