@@ -5,7 +5,11 @@ use bevy::{
 };
 use std::f32::consts::FRAC_PI_2;
 
-use crate::{ui::CameraSettings, AppState};
+use crate::{
+    setup,
+    ui::{grab_mouse_system, CameraSettings},
+    AppState,
+};
 
 const PLAYER_SPEED: f32 = 3.0;
 const PLAYER_HEIGHT: f32 = 1.8;
@@ -42,12 +46,12 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup_player.after("main_setup"))
+        app.add_startup_system(setup_player.after(setup))
             .add_system(
                 player_look_system
                     .in_set(OnUpdate(AppState::InGame))
                     .before(player_move_system)
-                    .after("grab_mouse")
+                    .after(grab_mouse_system)
                     .before(close_when_requested),
             )
             .add_system(player_move_system.in_set(OnUpdate(AppState::InGame)));

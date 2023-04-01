@@ -1,5 +1,3 @@
-use std::default;
-
 use bevy::prelude::*;
 // use bevy_rapier3d::prelude::*;
 
@@ -11,7 +9,7 @@ use ui::UIPlugin;
 const COLOR_BACKGROUND: Color = Color::rgb_linear(0.008, 0.008, 0.011);
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
-enum AppState {
+pub enum AppState {
     #[default]
     Start,
     InGame,
@@ -47,13 +45,13 @@ impl Plugin for GamePlugin {
             // .add_plugin(RapierDebugRenderPlugin::default())
             .add_plugin(PlayerPlugin)
             .add_plugin(UIPlugin)
-            .add_state()
-            .add_startup_system(setup.label("main_setup"))
+            .add_state::<AppState>()
+            .add_startup_system(setup)
             .add_system(setup_lights.in_set(OnUpdate(AppState::Start)));
     }
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Dungeon
     commands.spawn(SceneBundle {
         scene: asset_server.load("dungeon.gltf#Scene0"),

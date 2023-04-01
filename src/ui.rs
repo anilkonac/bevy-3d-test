@@ -40,11 +40,12 @@ impl Default for CameraSettings {
         CameraSettings {
             c_type: CameraType::ThirdPerson,
             distance: CAMERA_TPS_POS_RELATIVE.distance(Vec3::ZERO),
-            bloom: BloomSettings {
-                intensity: 0.002,
-                scale: 1.40,
-                ..default()
-            },
+            // bloom: BloomSettings {
+            //     intensity: 0.002,
+            //     scale: 1.40,
+            //     ..default()
+            // },
+            bloom: BloomSettings::default(),
             bloom_enabled: IS_DESKTOP_BUILD,
         }
     }
@@ -59,62 +60,57 @@ impl Plugin for UIPlugin {
             // .add_plugin(WorldInspectorPlugin::default())
             .insert_resource(CameraSettings::default())
             .add_system(ui_info.before(ui_graphics))
-            // .add_system_set(
-            //     SystemSet::on_update(AppState::Menu)
-            //         .with_system(ui_graphics.before(ui_camera))
-            //         .with_system(ui_camera.before(close_when_requested)),
-            // )
-            .add_system(ui_graphics.in_set(OnUpdate(AppState::Menu).before(ui_camera)))
-            .add_system(ui_camera.in_set(OnUpdate(AppState::Menu).before(close_when_requested)))
-            .add_system(grab_mouse_system.label("grab_mouse").before(ui_info))
+            // .add_system(ui_graphics.in_set(OnUpdate(AppState::Menu).before(ui_camera)))
+            // .add_system(ui_camera.in_set(OnUpdate(AppState::Menu).before(close_when_requested)))
+            .add_system(grab_mouse_system.before(ui_info))
             .add_system(switch_camera.before(ui_camera));
     }
 }
 
-fn grab_mouse_system(
-    mut primary_window_query: Query<&Window, With<PrimaryWindow>>,
-    mut app_state: ResMut<State<AppState>>,
+pub fn grab_mouse_system(
+    mut windows: Query<&mut Window>,
+    app_state: Res<State<AppState>>,
+    mut app_state_queue: ResMut<NextState<AppState>>,
     key: Res<Input<KeyCode>>,
     mouse: Res<Input<MouseButton>>,
 ) {
     if key.just_pressed(KeyCode::M) {
-        let mut window = primary_window_query.get_single_mut().unwrap();
+        let mut window = windows.single_mut();
 
-        match app_state.current() {
+        match app_state.0 {
             AppState::InGame => {
-                window.set_cursor_visibility(true);
-                window.set_cursor_grab_mode(CursorGrabMode::None);
-                app_state.set(AppState::Menu).unwrap();
+                window.cursor.visible = true;
+                window.cursor.grab_mode = CursorGrabMode::None;
             }
             AppState::Menu => {
-                window.set_cursor_visibility(false);
-                app_state.set(AppState::InGame).unwrap();
-                grab_mouse(window);
+                window.cursor.visible = false;
+                app_state_queue.set(AppState::InGame);
+                grab_mouse(&mut window);
             }
             _ => (),
         }
     }
 
-    if mouse.just_pressed(MouseButton::Left) && (*app_state.current() == AppState::Start) {
-        let mut window = primary_window_query.get_single_mut().unwrap();
-        window.set_cursor_visibility(false);
-        app_state.set(AppState::InGame).unwrap();
-        grab_mouse(window);
+    if mouse.just_pressed(MouseButton::Left) && (app_state.0 == AppState::Start) {
+        let mut window = windows.single_mut();
+        window.cursor.visible = false;
+        app_state_queue.set(AppState::InGame);
+        grab_mouse(&mut window);
     }
 }
 
 #[cfg(any(target_os = "macos", target_arch = "wasm32"))]
 fn grab_mouse(window: &mut Window) {
-    window.set_cursor_grab_mode(CursorGrabMode::Locked);
+    window.cursor.grab_mode = CursorGrabMode::Locked;
 }
 
 #[cfg(not(any(target_os = "macos", target_arch = "wasm32")))]
 fn grab_mouse(window: &mut Window) {
-    window.set_cursor_grab_mode(CursorGrabMode::Confined);
+    window.cursor.grab_mode = CursorGrabMode::Confined;
 }
 
 fn ui_info(mut egui_contexts: EguiContexts, app_state: Res<State<AppState>>) {
-    let contents: fn(&mut Ui) = match app_state.current() {
+    let contents: fn(&mut Ui) = match app_state.0 {
         AppState::Start => |ui| {
             ui.label("Click on the game screen to start");
         },
@@ -339,48 +335,48 @@ fn ui_camera(
         }
         ui.separator();
 
-        ui.add_enabled_ui(IS_DESKTOP_BUILD, |ui| {
-            let mut changed = false;
-            changed |= ui
-                .checkbox(&mut cam_settings.bloom_enabled, "Bloom")
-                .changed();
-            ui.horizontal(|ui| {
-                ui.label("Threshold");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut cam_settings.bloom.threshold).speed(0.01))
-                    .changed();
-            });
-            ui.horizontal(|ui| {
-                ui.label("Knee");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut cam_settings.bloom.knee).speed(0.01))
-                    .changed();
-            });
-            ui.horizontal(|ui| {
-                ui.label("Scale");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut cam_settings.bloom.scale).speed(0.01))
-                    .changed();
-            });
-            ui.horizontal(|ui| {
-                ui.label("Intensity");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut cam_settings.bloom.intensity).speed(0.0001))
-                    .changed();
-            });
+        // ui.add_enabled_ui(IS_DESKTOP_BUILD, |ui| {
+        //     let mut changed = false;
+        //     changed |= ui
+        //         .checkbox(&mut cam_settings.bloom_enabled, "Bloom")
+        //         .changed();
+        //     ui.horizontal(|ui| {
+        //         ui.label("Threshold");
+        //         changed |= ui
+        //             .add(egui::DragValue::new(&mut cam_settings.bloom.threshold).speed(0.01))
+        //             .changed();
+        //     });
+        //     ui.horizontal(|ui| {
+        //         ui.label("Knee");
+        //         changed |= ui
+        //             .add(egui::DragValue::new(&mut cam_settings.bloom.knee).speed(0.01))
+        //             .changed();
+        //     });
+        //     ui.horizontal(|ui| {
+        //         ui.label("Scale");
+        //         changed |= ui
+        //             .add(egui::DragValue::new(&mut cam_settings.bloom.scale).speed(0.01))
+        //             .changed();
+        //     });
+        //     ui.horizontal(|ui| {
+        //         ui.label("Intensity");
+        //         changed |= ui
+        //             .add(egui::DragValue::new(&mut cam_settings.bloom.intensity).speed(0.0001))
+        //             .changed();
+        //     });
 
-            if changed {
-                for mut bloom in query_bloom.iter_mut() {
-                    *bloom = cam_settings.bloom.clone();
-                }
-                for (mut cam, _) in query_cams.iter_mut() {
-                    cam.hdr = cam_settings.bloom_enabled;
-                }
-            }
-        });
-        if !IS_DESKTOP_BUILD {
-            ui.label("! Currently, bloom effect does not work in WebAssembly !");
-        }
+        //     if changed {
+        //         for mut bloom in query_bloom.iter_mut() {
+        //             *bloom = cam_settings.bloom.clone();
+        //         }
+        //         for (mut cam, _) in query_cams.iter_mut() {
+        //             cam.hdr = cam_settings.bloom_enabled;
+        //         }
+        //     }
+        // });
+        // if !IS_DESKTOP_BUILD {
+        //     ui.label("! Currently, bloom effect does not work in WebAssembly !");
+        // }
     };
 
     egui::Window::new("Camera")
