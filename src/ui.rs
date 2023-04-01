@@ -1,11 +1,13 @@
 use bevy::{
-    core_pipeline::bloom::BloomSettings, prelude::*, window::close_when_requested,
-    window::CursorGrabMode,
+    core_pipeline::bloom::BloomSettings,
+    prelude::*,
+    window::close_when_requested,
+    window::{CursorGrabMode, PrimaryWindow},
 };
 
 use bevy_egui::{
     egui::{self, Ui},
-    EguiContext, EguiPlugin,
+    EguiContexts, EguiPlugin,
 };
 // use bevy_inspector_egui::{widgets::InspectorQuery, InspectorPlugin, WorldInspectorPlugin};
 
@@ -57,24 +59,26 @@ impl Plugin for UIPlugin {
             // .add_plugin(WorldInspectorPlugin::default())
             .insert_resource(CameraSettings::default())
             .add_system(ui_info.before(ui_graphics))
-            .add_system_set(
-                SystemSet::on_update(AppState::Menu)
-                    .with_system(ui_graphics.before(ui_camera))
-                    .with_system(ui_camera.before(close_when_requested)),
-            )
+            // .add_system_set(
+            //     SystemSet::on_update(AppState::Menu)
+            //         .with_system(ui_graphics.before(ui_camera))
+            //         .with_system(ui_camera.before(close_when_requested)),
+            // )
+            .add_system(ui_graphics.in_set(OnUpdate(AppState::Menu).before(ui_camera)))
+            .add_system(ui_camera.in_set(OnUpdate(AppState::Menu).before(close_when_requested)))
             .add_system(grab_mouse_system.label("grab_mouse").before(ui_info))
             .add_system(switch_camera.before(ui_camera));
     }
 }
 
 fn grab_mouse_system(
-    mut windows: ResMut<Windows>,
+    mut primary_window_query: Query<&Window, With<PrimaryWindow>>,
     mut app_state: ResMut<State<AppState>>,
     key: Res<Input<KeyCode>>,
     mouse: Res<Input<MouseButton>>,
 ) {
     if key.just_pressed(KeyCode::M) {
-        let window = windows.get_primary_mut().unwrap();
+        let mut window = primary_window_query.get_single_mut().unwrap();
 
         match app_state.current() {
             AppState::InGame => {
@@ -92,7 +96,7 @@ fn grab_mouse_system(
     }
 
     if mouse.just_pressed(MouseButton::Left) && (*app_state.current() == AppState::Start) {
-        let window = windows.get_primary_mut().unwrap();
+        let mut window = primary_window_query.get_single_mut().unwrap();
         window.set_cursor_visibility(false);
         app_state.set(AppState::InGame).unwrap();
         grab_mouse(window);
@@ -109,7 +113,7 @@ fn grab_mouse(window: &mut Window) {
     window.set_cursor_grab_mode(CursorGrabMode::Confined);
 }
 
-fn ui_info(mut egui_context: ResMut<EguiContext>, app_state: Res<State<AppState>>) {
+fn ui_info(mut egui_contexts: EguiContexts, app_state: Res<State<AppState>>) {
     let contents: fn(&mut Ui) = match app_state.current() {
         AppState::Start => |ui| {
             ui.label("Click on the game screen to start");
@@ -129,7 +133,7 @@ fn ui_info(mut egui_context: ResMut<EguiContext>, app_state: Res<State<AppState>
         .id(egui::Id::new("Info"))
         .collapsible(false)
         .resizable(false)
-        .show(egui_context.ctx_mut(), contents);
+        .show(egui_contexts.ctx_mut(), contents);
 }
 
 fn switch_camera(
@@ -150,7 +154,7 @@ fn switch_camera(
 }
 
 fn ui_graphics(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_contexts: EguiContexts,
     mut query_light_point: Query<&mut PointLight>,
     mut clear_color: ResMut<ClearColor>,
     mut ambient_light: ResMut<AmbientLight>,
@@ -231,11 +235,11 @@ fn ui_graphics(
         }
     };
 
-    egui::Window::new("Graphics").show(egui_context.ctx_mut(), contents);
+    egui::Window::new("Graphics").show(egui_contexts.ctx_mut(), contents);
 }
 
 fn ui_camera(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_contexts: EguiContexts,
     mut cam_settings: ResMut<CameraSettings>,
     mut query_cams: Query<(&mut Camera, &mut Transform), With<Camera>>,
     mut query_bloom: Query<&mut BloomSettings>,
@@ -381,7 +385,7 @@ fn ui_camera(
 
     egui::Window::new("Camera")
         .id(egui::Id::new("Camera"))
-        .show(egui_context.ctx_mut(), contents);
+        .show(egui_contexts.ctx_mut(), contents);
 }
 
 #[inline]

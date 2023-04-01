@@ -1,4 +1,8 @@
-use bevy::{input::mouse::MouseMotion, prelude::*, window::close_when_requested};
+use bevy::{
+    input::mouse::MouseMotion,
+    prelude::*,
+    window::{close_when_requested, PrimaryWindow},
+};
 use std::f32::consts::FRAC_PI_2;
 
 use crate::{ui::CameraSettings, AppState};
@@ -39,16 +43,14 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_player.after("main_setup"))
-            .add_system_set(
-                SystemSet::on_update(AppState::InGame)
-                    .with_system(
-                        player_look_system
-                            .before(player_move_system)
-                            .after("grab_mouse")
-                            .before(close_when_requested),
-                    )
-                    .with_system(player_move_system),
-            );
+            .add_system(
+                player_look_system
+                    .in_set(OnUpdate(AppState::InGame))
+                    .before(player_move_system)
+                    .after("grab_mouse")
+                    .before(close_when_requested),
+            )
+            .add_system(player_move_system.in_set(OnUpdate(AppState::InGame)));
     }
 }
 
@@ -223,7 +225,7 @@ fn translate_player(
 fn player_look_system(
     mut mouse_motion_events: EventReader<MouseMotion>,
     mut query: Query<(&mut Transform, &mut HeadState), With<HeadState>>,
-    windows: Res<Windows>,
+    primary_query: Query<&Window, With<PrimaryWindow>>,
 ) {
     let mut delta = Vec2::ZERO;
     for event in mouse_motion_events.iter() {
@@ -236,7 +238,7 @@ fn player_look_system(
 
     let (mut transform, mut head_state) = query.single_mut();
 
-    let window = windows.get_primary().unwrap();
+    let window = primary_query.get_single().unwrap();
 
     let mut yaw = head_state.yaw;
     let mut pitch = head_state.pitch;

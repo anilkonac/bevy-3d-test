@@ -1,3 +1,5 @@
+use std::default;
+
 use bevy::prelude::*;
 // use bevy_rapier3d::prelude::*;
 
@@ -8,8 +10,9 @@ use ui::UIPlugin;
 
 const COLOR_BACKGROUND: Color = Color::rgb_linear(0.008, 0.008, 0.011);
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 enum AppState {
+    #[default]
     Start,
     InGame,
     Menu,
@@ -44,9 +47,9 @@ impl Plugin for GamePlugin {
             // .add_plugin(RapierDebugRenderPlugin::default())
             .add_plugin(PlayerPlugin)
             .add_plugin(UIPlugin)
-            .add_state(AppState::Start)
+            .add_state()
             .add_startup_system(setup.label("main_setup"))
-            .add_system_set(SystemSet::on_update(AppState::Start).with_system(setup_lights));
+            .add_system(setup_lights.in_set(OnUpdate(AppState::Start)));
     }
 }
 
