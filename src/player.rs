@@ -242,7 +242,7 @@ fn player_look_system(
 
     let (mut transform, mut head_state) = query.single_mut();
 
-    let window = primary_query.get_single().unwrap();
+    let window = primary_query.single();
 
     let mut yaw = head_state.yaw;
     let mut pitch = head_state.pitch;

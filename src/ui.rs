@@ -60,8 +60,16 @@ impl Plugin for UIPlugin {
             // .add_plugin(WorldInspectorPlugin::default())
             .insert_resource(CameraSettings::default())
             .add_system(ui_info.before(ui_graphics))
-            // .add_system(ui_graphics.in_set(OnUpdate(AppState::Menu).before(ui_camera)))
-            // .add_system(ui_camera.in_set(OnUpdate(AppState::Menu).before(close_when_requested)))
+            .add_system(
+                ui_graphics
+                    .in_set(OnUpdate(AppState::Menu))
+                    .before(ui_camera),
+            )
+            .add_system(
+                ui_camera
+                    .in_set(OnUpdate(AppState::Menu))
+                    .before(close_when_requested),
+            )
             .add_system(grab_mouse_system.before(ui_info))
             .add_system(switch_camera.before(ui_camera));
     }
@@ -81,6 +89,7 @@ pub fn grab_mouse_system(
             AppState::InGame => {
                 window.cursor.visible = true;
                 window.cursor.grab_mode = CursorGrabMode::None;
+                app_state_queue.set(AppState::Menu)
             }
             AppState::Menu => {
                 window.cursor.visible = false;
